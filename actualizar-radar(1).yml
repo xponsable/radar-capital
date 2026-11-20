@@ -1,0 +1,190 @@
+name: Actualizar Radar de Capital
+on:
+  workflow_dispatch:
+  schedule:
+    # De lunes a viernes a las 09:17 UTC; puede haber demoras.
+    - cron: '17 9 * * 1-5'
+permissions:
+  contents: write
+concurrency:
+  group: radar-data-update
+  cancel-in-progress: false
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependencias
+        run: python -m pip install requests
+      - name: Actualizar ETF, COT y rentabilidades
+        shell: bash
+        run: |
+          python - <<'PYRADAR'
+          #!/usr/bin/env python3
+          """Updates public fund flows, CFTC positions and ETF monthly returns.
+
+          Run from repository root: python scripts/update_data.py
+          Data sources and their limits are documented in README.md.
+          """
+          from __future__ import annotations
+          import csv
+          import io
+          import json
+          import os
+          import re
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import requests
+
+          ROOT = Path(__file__).resolve().parents[1]
+          OUT = ROOT / 'data' / 'snapshot.json'
+          TICKERS = ['SPY','QQQM','SOXX','IEUR','SHY','TLT','GLD','IAU','IBIT']
+          COT = {
+              'SPY': ('sp500-emini.tff.csv','net_asset_mgr_pct_oi'),
+              'QQQM': ('nasdaq-emini.tff.csv','net_asset_mgr_pct_oi'),
+              'SHY': ('2-year-treasury.tff.csv','net_asset_mgr_pct_oi'),
+              'TLT': ('30-year-treasury.tff.csv','net_asset_mgr_pct_oi'),
+              'ORO': ('gold.disagg.csv','net_m_money_pct_oi'),
+              'IBIT': ('bitcoin.tff.csv','net_asset_mgr_pct_oi'),
+          }
+          SESS = requests.Session()
+          SESS.headers.update({'User-Agent':'RadarRotacionCapital/1.0 (public research; sources credited)', 'Accept':'application/json,text/csv,*/*'})
+
+          def get(url: str, *, parse: str = 'json'):
+              r = SESS.get(url, timeout=35)
+              r.raise_for_status()
+              return r.json() if parse == 'json' else r.text
+
+          def month_of(s: str) -> str:
+              return s[:7]
+
+          def merge_etfiq(asset: dict, doc: dict):
+              if not doc.get('months') or doc.get('ticker') != asset.get('ticker'):
+                  return
+              previous = {v['d']: v for v in asset.get('daily', []) if 'd' in v}
+              previous.update({v['d']: {'d': v['d'], 'flow': float(v['flow']), 'src': v.get('src', 'daily'), 'spanDays': v.get('spanDays', 1)}
+                               for v in doc.get('daily', []) if v.get('flow') is not None and v.get('d')})
+              asset['daily'] = [previous[k] for k in sorted(previous) if k >= '2025-01-01']
+              old_months = {v['m']: v for v in asset.get('monthly', []) if v.get('m')}
+              for v in doc['months']:
+                  if v.get('flow') is None or not re.fullmatch(r'20\d\d-\d\d', v['m']): continue
+                  # Exclude N-PORT 'series' values (includes mutual fund share classes).
+                  if v.get('scope') == 'series':
+                      continue
+                  old_months[v['m']] = {'m':v['m'],'flow':float(v['flow']), 'src':v.get('src','ETFIQ')}
+              asset['monthly'] = [old_months[k] for k in sorted(old_months)]
+              asset['asOf'] = max(doc.get('asOf', ''), asset.get('asOf', ''))
+              asset['source'] = 'ETFIQ (suscripciones y reembolsos ETF)'
+
+
+          def sum_funds(target: dict, docs: list[dict]):
+              monthly = {}
+              common = None
+              for doc in docs:
+                  m={x['m']: x for x in doc.get('months',[]) if x.get('flow') is not None and x.get('scope')!='series'}
+                  common = set(m) if common is None else common & set(m)
+              for m in sorted(common or []):
+                  monthly[m]={'m':m,'flow':sum(next(v['flow'] for v in d['months'] if v['m']==m) for d in docs), 'src':'ETFIQ GLD+IAU'}
+              old = {v['m']:v for v in target.get('monthly',[])}
+              old.update(monthly)
+              target['monthly'] = [old[k] for k in sorted(old)]
+              common=None; per=[]
+              for doc in docs:
+                  d={x['d']:x for x in doc.get('daily',[]) if x.get('flow') is not None}
+                  per.append(d)
+                  common=set(d) if common is None else common & set(d)
+              older={v['d']:v for v in target.get('daily',[])}
+              for d in sorted(common or []):
+                  v=[p[d] for p in per]
+                  older[d]={'d':d,'flow':sum(float(q['flow']) for q in v), 'src':'GLD+IAU','spanDays':max(int(q.get('spanDays',1)) for q in v)}
+              target['daily']=[older[d] for d in sorted(older)]
+              target['asOf']=min(d.get('asOf','') for d in docs)
+
+
+          def update_cot(asset: dict, filename: str, col: str):
+              rows=list(csv.DictReader(io.StringIO(get('https://futuresbench.com/data/cot/'+filename,parse='text'))))
+              vals={r['report_date']: float(r[col]) for r in rows if r.get(col) not in (None,'') and r.get('report_date')}
+              # One value per week, plus month-end snapshot; no false daily reporting.
+              asset['cotWeekly']=[{'d':d,'value':vals[d]} for d in sorted(vals) if d >= '2025-01-01']
+              asset['cotAsOf']=max(vals)
+              asset['cotSource']='CFTC Commitments of Traders / FuturesBench; % open interest'
+
+
+          def update_prices(asset: dict):
+              sym=asset.get('priceTicker')
+              if not sym:return
+              # Yahoo prices may be blocked in CI; keep previous values if absent.
+              url=f'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=8y&interval=1mo'
+              j=get(url)
+              q=j['chart']['result'][0]
+              closes=q['indicators'].get('adjclose',[{}])[0].get('adjclose') or q['indicators']['quote'][0]['close']
+              data={datetime.fromtimestamp(t,timezone.utc).strftime('%Y-%m'): p for t,p in zip(q['timestamp'], closes) if p and p>0}
+              keys=sorted(data)
+              out={}
+              for i in range(1,len(keys)):
+                  # Require consecutive months.
+                  a,b=keys[i-1],keys[i]
+                  yy,mm=map(int,a.split('-')); expect=f'{yy+(mm==12):04d}-{mm%12+1:02d}'
+                  if b==expect:
+                      out[b]=(data[b]/data[a]-1)*100
+              asset['returnsMonthly']=[{'m':k,'value':out[k]} for k in sorted(out)]
+              asset['priceAsOf']=q['meta'].get('regularMarketTime')
+
+
+          def main():
+              if not OUT.exists():
+                  # First run: recover the original historical data embedded in the site.
+                  html = (ROOT / 'index.html').read_text('utf-8')
+                  match = re.search(r'<script>const EMBEDDED\s*=\s*(\{.*?\});?</script>', html, re.S)
+                  if not match:
+                      raise SystemExit('Cannot initialize historical snapshot from index.html')
+                  OUT.parent.mkdir(parents=True, exist_ok=True)
+                  OUT.write_text(json.dumps(json.loads(match.group(1)), ensure_ascii=False), encoding='utf-8')
+              data=json.loads(OUT.read_text('utf-8'))
+              assets={a['id']:a for a in data['assets']}
+              succeeded=[]; failed=[]; docs={}
+              for t in TICKERS:
+                  try:
+                      doc=get(f'https://etfiq.com/data/flows/funds/{t.lower()}.json')
+                      if doc.get('ticker') != t:raise ValueError('Unexpected ticker')
+                      docs[t]=doc
+                      if t not in ('GLD','IAU'):
+                          merge_etfiq(assets[t],doc)
+                      succeeded.append('ETFIQ '+t)
+                  except Exception as e:
+                      failed.append(f'ETFIQ {t}: {e}')
+              if 'GLD' in docs and 'IAU' in docs:
+                  try: sum_funds(assets['ORO'],[docs['GLD'],docs['IAU']]);succeeded.append('ETF oro agregado')
+                  except Exception as e:failed.append(f'ETF oro agregado: {e}')
+              for t,(file,col) in COT.items():
+                  try: update_cot(assets[t],file,col);succeeded.append('COT '+t)
+                  except Exception as e:failed.append(f'COT {t}: {e}')
+              for t in ['SPY','QQQM','SOXX','IEUR','SHY','TLT','ORO','IBIT']:
+                  try: update_prices(assets[t]);succeeded.append('Precio '+t)
+                  except Exception as e:failed.append(f'Precio {t}: {e}')
+              data['refreshDate']=datetime.now(timezone.utc).isoformat(timespec='seconds')
+              data['lastSuccess']=succeeded
+              data['lastErrors']=failed
+              tmp=OUT.with_suffix('.tmp')
+              tmp.write_text(json.dumps(data,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+              os.replace(tmp,OUT)
+              print('Updated:',len(succeeded),'errors:',len(failed))
+              for e in failed: print('WARN',e)
+              if not succeeded:
+                  raise SystemExit('Nothing updated; refusing to report fresh data')
+
+          if __name__=='__main__':main()
+          PYRADAR
+      - name: Guardar historico validado
+        shell: bash
+        run: |
+          git config user.name 'Radar Capital Bot'
+          git config user.email 'radar-bot@users.noreply.github.com'
+          git add data/snapshot.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Actualizar radar $(date -u +%F)"
+            git push
+          fi
