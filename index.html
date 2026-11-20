@@ -6,7 +6,7 @@
 :root{color-scheme:dark;--bg:#0a111d;--card:#121e30;--card2:#162438;--line:#273a50;--txt:#e9f2ff;--muted:#9bafc6;--gold:#c5970d;--green:#53d3af;--red:#f2808a}*{box-sizing:border-box}html{font-size:15px}body{margin:0;background:radial-gradient(ellipse at 70% -4%,#22324a 0%,#0a111d 40%,#09111c 100%);color:var(--txt);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}a{color:#e9c47c}button,select{font:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.wrap{max-width:1640px;margin:auto;padding:32px 30px 55px}.topline{color:#dfb650;text-transform:uppercase;letter-spacing:.18em;font-size:11px;font-weight:800;display:flex;gap:12px;align-items:center}.bullet{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px #53d3af88}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:8px 0 22px}.head h1{margin:0 0 7px;font-size:clamp(27px,3.6vw,42px);letter-spacing:-.046em;line-height:1.12}.subtitle{max-width:960px;color:var(--muted);font-size:14px;margin:0}.refresh{border:1px solid #a87c24;background:#352913;color:#f7d998;border-radius:11px;padding:11px 14px;white-space:nowrap}.refresh:hover{background:#493815}.statusbar{display:flex;flex-wrap:wrap;gap:9px 15px;color:#b6c5d8;font-size:12px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:#152134;margin:15px 0 22px}.statusbar strong{color:#ecf4ff}.layout{display:grid;grid-template-columns:minmax(0,1fr) 282px;gap:18px}.card{border:1px solid var(--line);border-radius:16px;background:linear-gradient(155deg,var(--card),#101b2b);box-shadow:0 12px 33px #0003;padding:18px}.main-title{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.main-title h2{font-size:18px;margin:0 0 5px}.desc{font-size:12px;color:var(--muted);margin:0 0 13px}.toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;padding:10px 0 17px}.toolbar label{color:var(--muted);font-size:11px;font-weight:700;display:flex;flex-direction:column;gap:5px;letter-spacing:.03em}.toolbar select{background:#1c2c43;color:var(--txt);border:1px solid #38516c;border-radius:9px;padding:9px 10px;min-width:108px}.toolbar select:focus,button:focus-visible{outline:2px solid #d8b25c;outline-offset:2px}.chart{min-height:440px;width:100%}.chart.small{min-height:280px}.legend-controls{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 4px}.chip{border:1px solid #405067;background:#1a2940;color:#d5dfeb;border-radius:20px;padding:6px 9px;display:flex;align-items:center;gap:7px;font-size:12px}.chip:hover{background:#233850}.chip.off{opacity:.39}.dot{width:9px;height:9px;border-radius:50%;display:inline-block}.hint{font-size:12px;color:#9eb2c8;margin:10px 0 1px;line-height:1.55}.panel-title{font-size:15px;font-weight:750;margin:0 0 10px}.side-line{padding:10px 0;border-bottom:1px solid var(--line)}.side-line strong{font-size:12px;display:block}.side-line small{color:var(--muted);font-size:11px}.side-line .value{font-size:18px;font-weight:750;font-variant-numeric:tabular-nums}.pos{color:var(--green)}.neg{color:var(--red)}.neutral{color:#d5dce8}.side-info{font-size:12px;line-height:1.6;color:#b9c9dc;margin-top:16px;padding:12px;background:#1a2c42;border-radius:11px}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-top:18px}.tablecard{margin-top:18px}.tblscroll{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px}th,td{border-bottom:1px solid #2b3a50;padding:10px;text-align:right}th:first-child,td:first-child{text-align:left}th{color:#aebed1;font-size:11px}td small{font-size:10px;color:#8ea4ba}.sources{font-size:12px;color:#aebed2;line-height:1.75;margin-top:22px}.alertline{border-left:3px solid var(--gold);padding:10px 12px;background:#27261b;color:#e3d4ad;font-size:12px;border-radius:0 8px 8px 0;margin-top:13px}.btn-quiet{color:#d9e6f7;border:1px solid #365069;background:#17293f;padding:8px 10px;border-radius:8px;font-size:12px}.btn-quiet:hover{background:#223951}.tiny{color:#96acc5;font-size:11px}.sticky-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.kpi{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}.kpi .tiny{font-size:10px}.empty{color:#bbcde1;font-size:13px;padding:20px}.badge{display:inline-block;color:#ecd18c;border:1px solid #5a4c2e;background:#302819;padding:3px 7px;border-radius:7px;font-size:10px;margin-left:5px}
 @media(max-width:1030px){.layout{grid-template-columns:1fr}.section-grid{grid-template-columns:1fr}.wrap{padding:19px 13px 30px}.head{flex-wrap:wrap}.card{padding:12px}.chart{min-height:370px}.toolbar{gap:8px}.toolbar select{min-width:100px}}
 
-/* Radar de Capital v2 — resumen de rotacion y experiencia movil */
+/* Radar de Capital v3 — sesiones cortas y experiencia movil */
 .rotation-panel{margin:18px 0 19px;padding:20px;border:1px solid #4a4560;border-radius:17px;background:linear-gradient(145deg,#1c243a 0%,#121e30 61%,#121c2c 100%);box-shadow:0 15px 34px #0003}
 .rotation-heading{display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .rotation-heading h2{font-size:19px;letter-spacing:-.015em;margin:4px 0 3px;color:#fff}
@@ -3975,23 +3975,23 @@ return Plotly;
   <div class="rotation-heading"><div>
     <span class="rotation-overline">Radar de rotación · lectura rápida</span>
     <h2 id="rotationTitle">¿Qué mercados reciben capital y cuáles lo pierden?</h2>
-    <p>Entradas y salidas netas de ETF representativos, con comparación frente al período anterior.</p>
+    <p>Entradas y salidas netas de ETF representativos, con comparación frente al período anterior. En sesiones cortas solo se comparan datos diarios completos.</p>
   </div><label class="rotation-period-control">PERÍODO
-    <select id="rotationPeriod" aria-label="Período del radar de rotación"><option value="1">1 mes completo</option><option value="3" selected>3 meses completos</option><option value="6">6 meses completos</option><option value="12">12 meses completos</option></select>
+    <select id="rotationPeriod" aria-label="Período del radar de rotación"><optgroup label="Sesiones bursátiles"><option value="s1">1 sesión · alerta puntual</option><option value="s3">3 sesiones</option><option value="s5" selected>5 sesiones</option><option value="s10">10 sesiones</option></optgroup><optgroup label="Meses completos"><option value="1">1 mes completo</option><option value="3">3 meses completos</option><option value="6">6 meses completos</option><option value="12">12 meses completos</option></optgroup></select>
   </label></div>
   <div id="rotationPulse" class="rotation-pulse" aria-live="polite">Calculando flujos del último período completo…</div>
   <div class="rotation-grid"><div class="rotation-col positive"><h3>↗ Más entradas netas</h3><p>ETF con saldo positivo en el período seleccionado</p><div id="rotationIn"></div></div>
   <div class="rotation-col negative"><h3>↘ Más salidas netas</h3><p>ETF con saldo negativo en el período seleccionado</p><div id="rotationOut"></div></div></div>
   <div class="rotation-rows"><div class="rotation-list-title"><strong>Clasificación de todos los ETF</strong><span id="rotationRangeLabel">Meses cerrados</span></div><div id="rotationRows"></div></div>
   <div id="rotationMmf" class="rotation-mmf"></div>
-  <p class="rotation-disclaimer">Los flujos miden suscripciones y reembolsos de ETF concretos (SPY, QQQM, SOXX, IEUR, SHY, TLT, GLD + IAU e IBIT), no todo el capital de cada mercado ni transferencias directas entre ellos. Los fondos monetarios se muestran aparte por su cobertura y frecuencia distintas. Los meses incompletos se excluyen de esta clasificación.</p>
+  <p class="rotation-disclaimer"><strong>Lectura de corto plazo:</strong> 1 sesión indica un movimiento puntual, no una tendencia. Para 3, 5 o 10 sesiones se exige dato válido en todas las fechas, sin rellenar huecos con ceros. Los ETF con registros incompletos aparecen sin datos comparables.<br><br>Los flujos miden suscripciones y reembolsos de ETF concretos (SPY, QQQM, SOXX, IEUR, SHY, TLT, GLD + IAU e IBIT), no todo el capital de cada mercado ni transferencias directas entre ellos. Los fondos monetarios se muestran aparte por su cobertura y frecuencia distintas. Los meses incompletos se excluyen de esta clasificación.</p>
 </section>
 
 <div class="layout"><section class="card">
 <div class="main-title"><h2>Comparador de flujos de capital</h2><button class="btn-quiet" id="csv">Descargar CSV</button></div>
 <p class="desc">Líneas ascendentes = entradas netas de capital; líneas descendentes = salidas. Cada línea parte de cero en el periodo seleccionado. Los flujos están expresados en miles de millones de USD.</p>
 <div class="toolbar">
-<label>PERIODO<select id="range"><option value="3m">Últimos 3 meses</option><option value="6m">Últimos 6 meses</option><option value="12m">Últimos 12 meses</option><option value="2026" selected>Todo 2026</option><option value="2025">Todo 2025</option><option value="all">Histórico completo</option></select></label>
+<label>PERIODO<select id="range"><optgroup label="Sesiones bursátiles"><option value="s1">1 sesión</option><option value="s3">3 sesiones</option><option value="s5">5 sesiones</option><option value="s10">10 sesiones</option></optgroup><optgroup label="Períodos largos"><option value="3m">Últimos 3 meses</option><option value="6m">Últimos 6 meses</option><option value="12m">Últimos 12 meses</option><option value="2026" selected>Todo 2026</option><option value="2025">Todo 2025</option><option value="all">Histórico completo</option></optgroup></select></label>
 <label>FRECUENCIA<select id="freq"><option value="monthly">Mensual (9 mercados)</option><option value="daily">Diaria (solo ETF)</option></select></label>
 <label>TIPO DE LÍNEA<select id="measure"><option value="cumulative">Flujo acumulado</option><option value="net">Flujo neto por periodo</option><option value="rolling">Tendencia (3 meses / 20 sesiones)</option></select></label><label>ESCALA<select id="scale"><option value="usd">USD reales</option><option value="relative">Relativa (±100)</option></select></label>
 <div class="sticky-controls"><button class="btn-quiet" id="allOn">Ver todos</button><button class="btn-quiet" id="allOff">Ocultar todos</button></div>
@@ -4018,11 +4018,30 @@ let enabled=new Set(AS().map(x=>x.id));let live=false;
 const dateFromMonth=m=>`${m}-01`;
 const assetVal=(a,m)=>a.monthly.find(x=>x.m===m)?.flow;
 const asStr=d=>{if(!d)return 'sin fecha';let s=d.slice(0,10);return /\d{4}-\d{2}-\d{2}/.test(s)?s.split('-').reverse().join('/'):s};
-function periodStart(){const r=$('range').value,now=new Date(); if(r==='all')return '2019-01-01';if(r==='2025')return '2025-01-01';if(r==='2026')return '2026-01-01';const latest=AS().flatMap(a=>a.daily.map(x=>x.d)).sort().at(-1) || new Date().toISOString().slice(0,10);const d=new Date(latest+'T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-parseInt(r));return d.toISOString().slice(0,10)}
+function shortSessionCount(value){const match=/^s(1|3|5|10)$/.exec(String(value||''));return match?Number(match[1]):0}
+function rotationCalendar(){
+  // SPY is the shared trading-session reference. Never interpolate missing ETF readings.
+  const spy=AS().find(a=>a.id==='SPY');
+  return [...new Set(cleanDaily(spy?.daily||[]).filter(v=>Number(v.spanDays||1)===1).map(v=>v.d))].sort();
+}
+function periodSessionDates(){const n=shortSessionCount($('range').value);return n?rotationCalendar().slice(-n):null}
+function periodStart(){const r=$('range').value;const dates=periodSessionDates();if(dates)return dates[0]||'9999-12-31';if(r==='all')return '2019-01-01';if(r==='2025')return '2025-01-01';if(r==='2026')return '2026-01-01';const latest=AS().flatMap(a=>a.daily.map(x=>x.d)).sort().at(-1) || new Date().toISOString().slice(0,10);const d=new Date(latest+'T00:00:00Z');d.setUTCMonth(d.getUTCMonth()-parseInt(r));return d.toISOString().slice(0,10)}
 function periodEnd(){return $('range').value==='2025'?'2025-12-31':null;}
 function cleanDaily(rows){return [...new Map((rows||[]).filter(v=>v.d&&v.flow!=null).map(x=>[x.d,x])).values()].sort((a,b)=>a.d.localeCompare(b.d))}
 function buildSeries(a,mode){let start=periodStart(),end=periodEnd();let raw;
- if(mode==='daily'){raw=cleanDaily(a.daily).filter(x=>x.d>=start && (!end||x.d<=end)).map(x=>({x:x.d,y:B(x.flow),src:x.src||'ETFIQ',spanDays:x.spanDays||1}));}
+ if(mode==='daily'){
+   const sessions=periodSessionDates();
+   if(sessions){
+     const byDate=new Map(cleanDaily(a.daily).map(x=>[x.d,x]));
+     raw=sessions.map(d=>{
+       const x=byDate.get(d),valid=x&&Number(x.spanDays||1)===1&&Number.isFinite(Number(x.flow));
+       return {x:d,y:valid?B(Number(x.flow)):null,src:valid?(x.src||'ETFIQ'):'Sin dato diario de una sola sesión',spanDays:valid?1:0};
+     });
+     if(!raw.some(x=>x.y!=null))return [];
+   }else{
+     raw=cleanDaily(a.daily).filter(x=>x.d>=start && (!end||x.d<=end)).map(x=>({x:x.d,y:B(x.flow),src:x.src||'ETFIQ',spanDays:x.spanDays||1}));
+   }
+ }
  else {const mdata=new Map((a.monthly||[]).map(v=>[v.m,v]));const sorted=[...mdata.keys()].sort();const lo=sorted[0],hi=sorted.at(-1);raw=[];if(lo&&hi){let d=new Date(lo+'-01T00:00:00Z');while(d.toISOString().slice(0,7)<=hi){const m=d.toISOString().slice(0,7),first=m+'-01',last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).toISOString().slice(0,10);if(last>=start&&(!end||first<=end)){let v=mdata.get(m);raw.push({x:last,y:v?B(v.flow):null,src:v?.src||'Dato mensual no disponible'})}d.setUTCMonth(d.getUTCMonth()+1)}}}
  if(!raw.length)return [];
  const metric=$('measure').value;
@@ -4037,30 +4056,30 @@ function formatPlot(div,traces,axisName,height){if(!window.Plotly){div.innerHTML
  div.style.height=plotHeight+'px';div.style.minHeight='0';
  if(isFlow && $('axisCaption'))$('axisCaption').textContent=axisName;
  const l={height:plotHeight,autosize:true,margin:mobile?{l:50,r:13,t:18,b:66}:{l:64,r:22,t:16,b:58},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:'Arial, sans-serif',color:C.text,size:mobile?10:11},hovermode:mobile?'closest':'x unified',showlegend:false,
-   xaxis:{type:'date',gridcolor:'#25364b',zeroline:false,tickformat:mobile?'%b %y':'%b %y',nticks:mobile?4:9,automargin:true,rangeslider:{visible:false}},
+   xaxis:{type:'date',gridcolor:'#25364b',zeroline:false,tickformat:shortSessionCount($('range').value)?'%d %b':'%b %y',nticks:mobile?4:9,automargin:true,rangeslider:{visible:false}},
    yaxis:{title:mobile?undefined:{text:axisName,font:{size:11}},gridcolor:'#2c3d51',zeroline:true,zerolinecolor:'#8b9bad',zerolinewidth:1.25,automargin:true,tickfont:{size:mobile?10:11}},
    hoverlabel:{bgcolor:'#223149',font:{color:'#f3f7ff'}},dragmode:mobile?false:'zoom'};
  const conf={responsive:true,displaylogo:false,displayModeBar:!mobile,modeBarButtonsToRemove:['lasso2d','select2d','autoScale2d']};
  Plotly.react(div,traces,l,conf).catch(e=>{div.innerHTML='<div class="empty">Error al dibujar: '+String(e).slice(0,110)+'</div>'});
 }
 function chartTrace(a,p,stackMode=false,unit="mil M$"){let xs=[],ys=[],extra=[];for(let i=0;i<p.length;i++){let v=p[i];if(stackMode && i>0){let gap=(new Date(v.x)-new Date(p[i-1].x))/864e5;if(gap>8){xs.push(new Date((new Date(v.x).getTime()+new Date(p[i-1].x).getTime())/2).toISOString().slice(0,10));ys.push(null);extra.push('Falta histórico diario')}}xs.push(v.x);ys.push(v.y);extra.push(v.src||'ETF')}
- return {type:'scatter',mode:'lines',name:a.name,x:xs,y:ys,connectgaps:false,customdata:extra,hovertemplate:'<b>'+a.name+'</b>: %{y:.2f} '+unit+'<br>%{x|%d/%m/%Y}<br>%{customdata}<extra></extra>',line:{color:a.color,width:2.6,shape:stackMode?'linear':'linear',dash:a.id==='MMF'?'dot':'solid'},opacity:1};}
+ return {type:'scatter',mode:shortSessionCount($('range').value)?'lines+markers':'lines',marker:{size:8},name:a.name,x:xs,y:ys,connectgaps:false,customdata:extra,hovertemplate:'<b>'+a.name+'</b>: %{y:.2f} '+unit+'<br>%{x|%d/%m/%Y}<br>%{customdata}<extra></extra>',line:{color:a.color,width:2.6,shape:stackMode?'linear':'linear',dash:a.id==='MMF'?'dot':'solid'},opacity:1};}
 function renderFlows(){let mode=$('freq').value,metric=$('measure').value,relative=$('scale').value==='relative';let traces=[];for(let a of AS()){if(!enabled.has(a.id))continue;let p=buildSeries(a,mode);if(relative&&p.length){let max=Math.max(0,...p.map(x=>Math.abs(x.y||0)));p=p.map(x=>({...x,y:x.y==null?null:max?x.y/max*100:0}))}if(p.length)traces.push(chartTrace(a,p,mode==='daily',relative?'escala relativa':'mil M$'))}
  const y=metric==='cumulative'?'Flujo neto acumulado · mil M$':metric==='net'?'Flujo neto · mil M$':mode==='daily'?'Flujo 20 sesiones · mil M$':'Flujo 3 meses · mil M$';
  formatPlot($('flowChart'),traces,relative?'Escala relativa (máximo absoluto = 100)':y,480);
  let missing=mode==='daily'?AS().filter(a=>enabled.has(a.id)&&!a.daily.length).map(a=>a.name):[];
- $('flowNote').textContent=(relative?'Vista relativa: cada línea se divide por su máximo valor absoluto en el periodo seleccionado. Permite comparar dirección y forma, NO cantidades de dólares. ':'')+(mode==='daily'?'Serie diaria: fechas reales de cada ETF; '+(missing.length?'sin flujo diario: '+missing.join(', ')+'. ':'')+'Ningún valor ausente se convierte en cero. Los flujos pueden publicarse con demora.':'Serie mensual: desde el primer mes publicado; el último mes es parcial. Los huecos interrumpen la línea y reinician el tramo acumulado; no se imputan datos. Monetarios no se actualiza a diario.');
+ $('flowNote').textContent=(shortSessionCount($('range').value)?'Período corto de '+shortSessionCount($('range').value)+(shortSessionCount($('range').value)===1?' sesión':' sesiones')+'. Fecha de referencia: '+asStr(rotationCalendar().at(-1))+'. Los ETF sin lectura de una sola sesión se marcan como ausentes. ': '')+(relative?'Vista relativa: cada línea se divide por su máximo valor absoluto en el periodo seleccionado. Permite comparar dirección y forma, NO cantidades de dólares. ':'')+(mode==='daily'?'Serie diaria: fechas reales de cada ETF; '+(missing.length?'sin flujo diario: '+missing.join(', ')+'. ':'')+'Ningún valor ausente se convierte en cero. Los flujos pueden publicarse con demora.':'Serie mensual: desde el primer mes publicado; el último mes es parcial. Los huecos interrumpen la línea y reinician el tramo acumulado; no se imputan datos. Monetarios no se actualiza a diario.');
 }
 function renderChips(){let host=$('assetButtons');host.innerHTML='';for(const a of AS()){let b=document.createElement('button');b.className='chip'+(enabled.has(a.id)?'':' off');b.type='button';b.innerHTML=`<span class="dot" style="background:${a.color}"></span>${a.name}`;b.title=a.ticker;b.onclick=()=>{enabled.has(a.id)?enabled.delete(a.id):enabled.add(a.id);redraw()};host.appendChild(b)}}
 function renderRecent(){let el=$('lastReadings');el.innerHTML='';for(let a of AS()){let p=[...(a.monthly||[])].sort((x,y)=>x.m.localeCompare(y.m)).at(-1);const v=p?B(p.flow):null;let item=document.createElement('div');item.className='side-line';let txt=document.createElement('div');txt.className='kpi';const n=document.createElement('strong');n.textContent=a.name+' · '+a.ticker; n.style.color=a.color;n.style.flex='1';const r=document.createElement('span');r.className='value '+(v===null?'neutral':v>=0?'pos':'neg');r.textContent=(v>0?'+':'')+fmt(v,2);txt.append(n,r);let s=document.createElement('small');s.textContent=(p?.m||'—')+' · mil M$'+(a.id==='MMF'?' · mensual SEC':'');item.append(txt,s);el.appendChild(item)}}
 function valRange(){let start=periodStart();return [start,periodEnd()];}
-function renderReturns(){const [start,end]=valRange();let traces=[];for(const a of AS()){if(!enabled.has(a.id)||!a.returnsMonthly.length)continue;let dates=[...a.returnsMonthly].sort((x,y)=>x.m.localeCompare(y.m)).filter(v=>dateFromMonth(v.m)>=start&&(!end||dateFromMonth(v.m)<=end));let total=1;let xs=[],ys=[];for(const p of dates){total*=1+p.value/100;xs.push(dateFromMonth(p.m));ys.push((total-1)*100)}if(!xs.length)continue;traces.push({type:'scatter',mode:'lines',name:a.name,x:xs,y:ys,hovertemplate:'<b>'+a.name+'</b> %{y:.1f}%<br>%{x|%m/%Y}<extra></extra>',line:{color:a.color,width:2.2}})}
+function renderReturns(){if(shortSessionCount($('range').value)){$('returnChart').innerHTML='<div class=\"empty\">Las rentabilidades disponibles son mensuales. Selecciona un período largo para verlas; no se convierten a datos diarios.</div>';return;}const [start,end]=valRange();let traces=[];for(const a of AS()){if(!enabled.has(a.id)||!a.returnsMonthly.length)continue;let dates=[...a.returnsMonthly].sort((x,y)=>x.m.localeCompare(y.m)).filter(v=>dateFromMonth(v.m)>=start&&(!end||dateFromMonth(v.m)<=end));let total=1;let xs=[],ys=[];for(const p of dates){total*=1+p.value/100;xs.push(dateFromMonth(p.m));ys.push((total-1)*100)}if(!xs.length)continue;traces.push({type:'scatter',mode:'lines',name:a.name,x:xs,y:ys,hovertemplate:'<b>'+a.name+'</b> %{y:.1f}%<br>%{x|%m/%Y}<extra></extra>',line:{color:a.color,width:2.2}})}
  formatPlot($('returnChart'),traces,'Rentabilidad acumulada (%)',300);}
 function renderCot(){const [start,end]=valRange();let traces=[];for(const a of AS()){if(!enabled.has(a.id))continue;let ps= a.cotWeekly?.length ? a.cotWeekly.filter(x=>x.d>=start&&(!end||x.d<=end)).map(x=>({x:x.d,y:x.value})) : a.cotMonthly.filter(x=>dateFromMonth(x.m)>=start&&(!end||dateFromMonth(x.m)<=end)).map(x=>({x:dateFromMonth(x.m),y:x.value}));if(!ps.length)continue;traces.push({type:'scatter',mode:'lines',name:a.name,x:ps.map(x=>x.x),y:ps.map(x=>x.y),hovertemplate:'<b>'+a.name+'</b> %{y:.1f}% OI<extra></extra>',line:{color:a.color,width:2.2}})}
  formatPlot($('cotChart'),traces,'Posición neta (% OI)',300);}
 function renderTable(){let keys=[...new Set(AS().flatMap(a=>a.monthly.map(v=>v.m)))].sort().slice(-7);$('flowTableHead').innerHTML='<tr><th>Mercado</th>'+keys.map(m=>'<th>'+m+(m===new Date().toISOString().slice(0,7)?'*':'')+'</th>').join('')+'</tr>';let rows='';for(const a of AS()){let cells=keys.map(m=>{let x=a.monthly.find(v=>v.m===m);let v=x?B(x.flow):null;return `<td class="${v==null?'neutral':v>=0?'pos':'neg'}">${v==null?'—':(v>0?'+':'')+fmt(v)}</td>`}).join('');rows+=`<tr><td><b style="color:${a.color}">${a.name}</b><br><small>${a.ticker}</small></td>${cells}</tr>`}$('flowTableBody').innerHTML=rows}
 
-/* Resumen de rotacion: unicamente meses completos, sin imputar ausencias. */
+/* Resumen de rotacion: sesiones de mercado o meses completos, sin imputar ausencias. */
 const rotationEsc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function rotationMonthAdd(m, delta){const [y,mo]=m.split('-').map(Number);return new Date(Date.UTC(y,mo-1+delta,1)).toISOString().slice(0,7)}
 function rotationLabel(m){const [y,mo]=m.split('-').map(Number);return new Intl.DateTimeFormat('es-ES',{month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(y,mo-1,1)))}
@@ -4076,38 +4095,59 @@ function rotationSum(a, months){const vals=new Map((a.monthly||[]).filter(x=>x.m
 }
 function rotationValue(v){return (v>0?'+':'')+fmt(v,2)+' mil M$'}
 function rotationWinner(a){return '<div class="rotation-winner"><div class="name">'+rotationEsc(a.name)+'<span class="symbol">'+rotationEsc(a.ticker)+'</span></div><div class="amount '+(a.flow>=0?'pos':'neg')+'">'+rotationValue(a.flow)+'</div></div>'}
+function rotationDailySum(a,dates){
+  if(!dates.length)return null;
+  const vals=new Map(cleanDaily(a.daily).map(v=>[v.d,v]));
+  // A multi-session capture cannot be assigned to an individual day.
+  if(!dates.every(d=>{const v=vals.get(d);return v&&Number(v.spanDays||1)===1&&Number.isFinite(Number(v.flow));}))return null;
+  return dates.reduce((sum,d)=>sum+Number(vals.get(d).flow),0)/1e9;
+}
 function renderRotationPanel(){
-  const count=Number($('rotationPeriod').value)||3, last=rotationClosedMonth();
-  if(!last){$('rotationPulse').textContent='Aún no hay meses completos disponibles';return}
-  const current=Array.from({length:count},(_,i)=>rotationMonthAdd(last,i-count+1));
-  const previous=Array.from({length:count},(_,i)=>rotationMonthAdd(last,i-2*count+1));
+  const sel=$('rotationPeriod').value,sessions=shortSessionCount(sel),count=sessions||Number(sel)||3;
+  let current,previous,desc,comparison;
+  if(sessions){
+    const dates=rotationCalendar();
+    if(dates.length<sessions){$('rotationPulse').textContent='No hay suficientes sesiones diarias para el per\u00edodo seleccionado';return;}
+    current=dates.slice(-sessions);
+    previous=dates.slice(-2*sessions,-sessions);
+    desc=asStr(current[0])+(sessions===1?'': ' - '+asStr(current.at(-1)))+' | '+sessions+(sessions===1?' sesi\u00f3n':' sesiones');
+    comparison=previous.length===sessions?asStr(previous[0])+(sessions===1?'':' - '+asStr(previous.at(-1))):'No disponible';
+  }else{
+    const last=rotationClosedMonth();
+    if(!last){$('rotationPulse').textContent='A\u00fan no hay meses completos disponibles';return;}
+    current=Array.from({length:count},(_,i)=>rotationMonthAdd(last,i-count+1));
+    previous=Array.from({length:count},(_,i)=>rotationMonthAdd(last,i-2*count+1));
+    desc=rotationLabel(current[0])+' - '+rotationLabel(last)+' | '+count+(count===1?' mes completo':' meses completos');
+    comparison=rotationLabel(previous[0])+' - '+rotationLabel(previous.at(-1));
+  }
   const rows=AS().filter(a=>a.id!=='MMF').map(a=>{
-    const flow=rotationSum(a,current),prior=rotationSum(a,previous);
+    const flow=sessions?rotationDailySum(a,current):rotationSum(a,current);
+    const prior=sessions?(previous.length===sessions?rotationDailySum(a,previous):null):rotationSum(a,previous);
     return {...a,flow,prior,delta:flow!=null&&prior!=null?flow-prior:null};
   });
   const ready=rows.filter(r=>r.flow!=null).sort((a,b)=>b.flow-a.flow);
   const missing=rows.filter(r=>r.flow==null);
-  $('rotationPulse').innerHTML='<span><strong>'+rotationEsc(rotationLabel(current[0]))+' – '+rotationEsc(rotationLabel(last))+'</strong> · '+count+' '+(count===1?'mes completo':'meses completos')+'</span><span>'+ready.length+'/8 ETF con período completo · comparación: '+rotationEsc(rotationLabel(previous[0]))+' – '+rotationEsc(rotationLabel(previous.at(-1)))+'</span>';
-  $('rotationRangeLabel').textContent='Entradas/salidas netas · miles de millones USD';
+  $('rotationPulse').innerHTML='<span><strong>'+rotationEsc(desc)+'</strong></span><span>'+ready.length+'/8 ETF con datos completos | Comparaci\u00f3n: '+rotationEsc(comparison)+(sessions===1?' | Movimiento puntual, no tendencia':'')+'</span>';
+  $('rotationRangeLabel').textContent=sessions?'Flujos netos en '+sessions+(sessions===1?' sesi\u00f3n':' sesiones')+' | mil M$':'Entradas/salidas netas | mil M$';
   const incoming=ready.filter(x=>x.flow>0).slice(0,3);
   const outgoing=[...ready].filter(x=>x.flow<0).sort((a,b)=>a.flow-b.flow).slice(0,3);
   $('rotationIn').innerHTML=incoming.length?incoming.map(rotationWinner).join(''):'<div class="empty">Ninguna entrada neta en los ETF comparables.</div>';
   $('rotationOut').innerHTML=outgoing.length?outgoing.map(rotationWinner).join(''):'<div class="empty">Ninguna salida neta en los ETF comparables.</div>';
   const biggest=Math.max(1,...ready.map(x=>Math.abs(x.flow)));
   $('rotationRows').innerHTML=[...ready,...missing].map(a=>{
-    const v=a.flow, valid=v!=null;
+    const v=a.flow,valid=v!=null;
     const w=valid?Math.max(3,Math.abs(v)/biggest*100):0;
-    const delta=a.delta==null?'Sin datos comparables':((a.delta>0?'↑ ':'↓ ')+(a.delta>0?'+':'')+fmt(a.delta,2)+' mil M$ vs. anterior');
+    const delta=a.delta==null?'Sin datos comparables':((a.delta>0?'\u2191 ':'\u2193 ')+(a.delta>0?'+':'')+fmt(a.delta,2)+' mil M$ vs. anterior');
     const cls=a.delta==null?'':a.delta>0?'up':a.delta<0?'down':'';
     return '<div class="rotation-row"><div class="market" title="'+rotationEsc(a.name)+' ('+rotationEsc(a.ticker)+')"><span class="dot" style="background:'+rotationEsc(a.color)+'"></span><span class="market-label">'+rotationEsc(a.name)+'</span></div><div class="rotation-bar"><span class="fill '+(v>=0?'plus':'minus')+'" style="width:'+w.toFixed(2)+'%"></span></div><div class="amount '+(v==null?'neutral':v>=0?'pos':'neg')+'">'+(valid?rotationValue(v):'Sin datos')+'</div><div class="delta '+cls+'">'+delta+'</div></div>';
   }).join('');
   const mmf=AS().find(x=>x.id==='MMF');
   if(mmf){const p=[...(mmf.monthly||[])].filter(x=>x.flow!=null).sort((a,b)=>a.m.localeCompare(b.m)).at(-1);
-    $('rotationMmf').innerHTML='<div><strong>Fondos monetarios · serie independiente</strong><div class="desc">'+(p?'Último mes publicado: '+rotationEsc(rotationLabel(p.m)):'Sin dato mensual')+' · no incluido en el ranking de ETF</div></div><span class="amount '+(p?(p.flow>=0?'pos':'neg'):'neutral')+'">'+(p?rotationValue(B(p.flow)):'—')+'</span>';
+    $('rotationMmf').innerHTML='<div><strong>Fondos monetarios | serie independiente</strong><div class="desc">'+(p?'\u00daltimo mes publicado: '+rotationEsc(rotationLabel(p.m)):'Sin dato mensual')+' | no incluido en el ranking de ETF'+(sessions?' ni en la comparaci\u00f3n diaria':'')+'</div></div><span class="amount '+(p?(p.flow>=0?'pos':'neg'):'neutral')+'">'+(p?rotationValue(B(p.flow)):'\u2014')+'</span>';
   }
 }
 
-function redraw(){renderRotationPanel();renderChips();renderFlows();renderReturns();renderCot();renderRecent();renderTable();let all=AS().filter(a=>a.id!=='MMF').map(a=>a.asOf).filter(Boolean).sort();$('freshness').textContent=asStr(all.at(-1)||'2026-11-17')+' (ETF); monetarios '+asStr(AS().find(a=>a.id==='MMF').asOf);}
+function redraw(){const short=shortSessionCount($('range').value);$('freq').disabled=!!short;if(short){$('freq').value='daily';if($('measure').value==='rolling')$('measure').value='net';}$('measure').querySelector('option[value="rolling"]').disabled=!!short;renderRotationPanel();renderChips();renderFlows();renderReturns();renderCot();renderRecent();renderTable();let all=AS().filter(a=>a.id!=='MMF').map(a=>a.asOf).filter(Boolean).sort();$('freshness').textContent=asStr(all.at(-1)||'2026-11-17')+' (ETF); monetarios '+asStr(AS().find(a=>a.id==='MMF').asOf);}
 function mergeDoc(a,doc){if(!doc||doc.ticker!==a.ticker||!doc.months)return false;
  let curr=new Map(a.monthly.map(x=>[x.m,x]));let count=0;
  for(let v of doc.months){if(v.flow==null||v.scope==='series'||!/^20\d\d-\d\d$/.test(v.m))continue;curr.set(v.m,{m:v.m,flow:Number(v.flow),src:v.src||'ETFIQ'});count++}
