@@ -39,7 +39,7 @@ jobs:
           from pathlib import Path
           import requests
 
-          ROOT = Path(__file__).resolve().parents[1]
+          ROOT = Path.cwd()
           OUT = ROOT / 'data' / 'snapshot.json'
           TICKERS = ['SPY','QQQM','SOXX','IEUR','SHY','TLT','GLD','IAU','IBIT']
           COT = {
