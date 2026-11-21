@@ -3982,6 +3982,23 @@ return Plotly;
 .flow-price-extra{grid-column:1/-1;font-size:10px;color:#a9c1d9;line-height:1.5;margin-top:-1px}
 @media(max-width:760px){.freshness-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#freshAssetRows{grid-template-columns:1fr}.freshness-compact{padding:11px}.flow-price-extra{font-size:10px}}
 </style>
+<style id="radar-v51-style">
+.price-fresh-card{margin:16px 0 20px;border-color:#38506b}
+.price-fresh-card .main-title{display:flex;align-items:flex-start;gap:18px;justify-content:space-between;flex-wrap:wrap}
+.price-period-control{display:flex;flex-direction:column;gap:6px;flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.03em;color:#b8cce5}
+.price-period-control select{max-width:190px}
+.price-fresh-summary{margin:10px 0 2px;display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:#bfd6ed}
+.price-fresh-summary strong{color:#8de0d0}
+.price-fresh-rows{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:13px}
+.price-market{min-width:0;padding:9px 10px;background:#14253b;border:1px solid #29435d;border-radius:9px}
+.price-market-head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#e3ebfc}
+.price-market-color{display:block;width:9px;height:9px;flex-shrink:0;border-radius:50%}
+.price-market strong{font-size:12px;display:block;margin:6px 0 3px;color:#f3f6ff}
+.price-market small{font-size:10px;line-height:1.45;color:#adc2d8;display:block}
+.price-market .price-up{color:#64d8a9}.price-market .price-down{color:#fd999d}
+@media(max-width:900px){.price-fresh-rows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.price-fresh-card{margin:10px 0 15px}.price-fresh-rows{gap:6px}.price-market{padding:8px}.price-fresh-card .main-title{gap:8px}.price-period-control select{max-width:none}.price-fresh-summary{font-size:11px}}
+</style>
 <style id="radar-v5-style">
 .view-mode-note{font-size:11px;color:#a9bed8;margin:0 0 14px}
 #dataViewMode{max-width:270px}
@@ -4012,8 +4029,8 @@ return Plotly;
   </div><label class="rotation-period-control">PERÍODO
     <select id="rotationPeriod" aria-label="Período del radar de rotación"><optgroup label="Sesiones bursátiles"><option value="s1">1 sesión · alerta puntual</option><option value="s3">3 sesiones</option><option value="s5" selected>5 sesiones</option><option value="s10">10 sesiones</option></optgroup><optgroup label="Meses completos"><option value="1">1 mes completo</option><option value="3">3 meses completos</option><option value="6">6 meses completos</option><option value="12">12 meses completos</option></optgroup></select>
   </label><label class="rotation-period-control" title="Usa fechas idénticas para comparar o la máxima frescura en cada ETF">VISTA
-    <select id="dataViewMode" aria-label="Modo de fechas"><option value="sync" selected>Fechas iguales · comparar</option><option value="latest">Últimos datos · individual</option></select>
-  </label></div><p id="viewModeText" class="view-mode-note">Mismas fechas en todos los mercados; comparación válida.</p>
+    <select id="dataViewMode" aria-label="Modo de fechas"><option value="latest" selected>Últimos datos · individual</option><option value="sync">Fechas iguales · comparar</option></select>
+  </label></div><p id="viewModeText" class="view-mode-note">Cada mercado muestra su última sesión con flujo confirmado. La vista comparativa por fechas iguales sigue disponible.</p>
   <div id="rotationPulse" class="rotation-pulse" aria-live="polite">Calculando flujos del último período completo…</div>
   <div class="rotation-grid"><div class="rotation-col positive"><h3>↗ Más entradas netas</h3><p>ETF con saldo positivo en el período seleccionado</p><div id="rotationIn"></div></div>
   <div class="rotation-col negative"><h3>↘ Más salidas netas</h3><p>ETF con saldo negativo en el período seleccionado</p><div id="rotationOut"></div></div></div>
@@ -4022,11 +4039,22 @@ return Plotly;
   <p class="rotation-disclaimer"><strong>Lectura de corto plazo:</strong> 1 sesión indica un movimiento puntual, no una tendencia. Para 3, 5 o 10 sesiones se exige dato válido en todas las fechas, sin rellenar huecos con ceros. Los ETF con registros incompletos aparecen sin datos comparables. En vista individual los mercados pueden terminar en distintas fechas y su ranking queda desactivado.<br><br>Los flujos miden suscripciones y reembolsos de ETF concretos (SPY, QQQM, SOXX, IEUR, SHY, TLT, GLD + IAU e IBIT), no todo el capital de cada mercado ni transferencias directas entre ellos. Los fondos monetarios se muestran aparte por su cobertura y frecuencia distintas. Los meses incompletos se excluyen de esta clasificación.</p>
 </section>
 
+<section class="card price-fresh-card" aria-labelledby="priceLatestTitle">
+ <div class="main-title"><div><h2 id="priceLatestTitle">Cotizaciones hasta la última sesión cerrada</h2><p class="desc">Movimiento real del precio de los ETF, independiente de sus flujos netos. La línea de precios puede llegar al viernes 20 aunque los flujos solo estén confirmados hasta el jueves 19 o el miércoles 18.</p></div>
+ <label class="price-period-control">PERÍODO DE PRECIO
+  <select id="priceRangeSelect" aria-label="Sesiones de evolución de precios"><option value="1">1 sesión</option><option value="3">3 sesiones</option><option value="5" selected>5 sesiones</option><option value="10">10 sesiones</option><option value="20">20 sesiones</option></select>
+ </label></div>
+ <div id="priceFreshSummary" class="price-fresh-summary" aria-live="polite">Consultando cierres de precios…</div>
+ <div id="priceFreshChart" class="chart" style="min-height:330px"></div>
+ <div id="priceFreshRows" class="price-fresh-rows" aria-label="Fechas de precios y flujos individuales"></div>
+ <p class="hint"><strong>Cómo interpretarlo:</strong> este gráfico muestra <strong>precios, no entradas o salidas de capital</strong>. Los flujos confirmados están en la tabla y en el gráfico inferior. Un cierre del 20 nunca se usa para calcular el retorno asociado a un flujo que termina el 18 o el 19.</p>
+</section>
+
 <div class="layout"><section class="card">
 <div class="main-title"><h2>Comparador de flujos de capital</h2><button class="btn-quiet" id="csv">Descargar CSV</button></div>
 <p class="desc">Líneas ascendentes = entradas netas de capital; líneas descendentes = salidas. Cada línea parte de cero en el periodo seleccionado. Los flujos están expresados en miles de millones de USD.</p>
 <div class="toolbar">
-<label>PERIODO<select id="range"><optgroup label="Sesiones bursátiles"><option value="s1">1 sesión</option><option value="s3">3 sesiones</option><option value="s5">5 sesiones</option><option value="s10">10 sesiones</option></optgroup><optgroup label="Períodos largos"><option value="3m">Últimos 3 meses</option><option value="6m">Últimos 6 meses</option><option value="12m">Últimos 12 meses</option><option value="2026" selected>Todo 2026</option><option value="2025">Todo 2025</option><option value="all">Histórico completo</option></optgroup></select></label>
+<label>PERIODO<select id="range"><optgroup label="Sesiones bursátiles"><option value="s1">1 sesión</option><option value="s3">3 sesiones</option><option value="s5" selected>5 sesiones</option><option value="s10">10 sesiones</option></optgroup><optgroup label="Períodos largos"><option value="3m">Últimos 3 meses</option><option value="6m">Últimos 6 meses</option><option value="12m">Últimos 12 meses</option><option value="2026">Todo 2026</option><option value="2025">Todo 2025</option><option value="all">Histórico completo</option></optgroup></select></label>
 <label>FRECUENCIA<select id="freq"><option value="monthly">Mensual (9 mercados)</option><option value="daily">Diaria (solo ETF)</option></select></label>
 <label>TIPO DE LÍNEA<select id="measure"><option value="cumulative">Flujo acumulado</option><option value="net">Flujo neto por periodo</option><option value="rolling">Tendencia (3 meses / 20 sesiones)</option></select></label><label>ESCALA<select id="scale"><option value="usd">USD reales</option><option value="relative">Relativa (±100)</option></select></label>
 <div class="sticky-controls"><button class="btn-quiet" id="allOn">Ver todos</button><button class="btn-quiet" id="allOff">Ocultar todos</button></div>
@@ -4456,4 +4484,72 @@ $('range').onchange=redraw;$('freq').onchange=redraw;
 $('measure').onchange=redraw;$('scale').onchange=redraw;
 $('reloadBtn').onclick=refresh;
 })();
+</script>
+<script>
+/* Radar de Capital 5.1: independent current-session ETF price monitoring.
+ * Read-only UI overlay. Does not alter flows, date provenance or saved history. */
+(function(){
+'use strict';
+const ids=['SPY','QQQM','SOXX','IEUR','SHY','TLT','ORO','IBIT'];
+const dateES=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)?d.split('-').reverse().join('/'):'—';
+const fmtP=(v,d=2)=>Number.isFinite(v)?new Intl.NumberFormat('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v):'—';
+const sym=v=>v>0?'+':'';
+function lastSessionDates(){
+ const all=DB.freshness?.sessionDates;
+ return Array.isArray(all)&&all.length>10?all: [...new Set(DB.assets.flatMap(a=>(a.pricesDaily||[]).map(x=>x.d)))].sort();
+}
+function drawLatestPrices(){
+ const elem=document.getElementById('priceFreshChart');
+ if(!elem)return;
+ const period=Number(document.getElementById('priceRangeSelect').value)||5;
+ const arr=ids.map(id=>DB.assets.find(a=>a.id===id)).filter(a=>a&&enabled.has(a.id));
+ const dates=lastSessionDates();
+ let latestAll=arr.map(a=>a.pricesDaily?.at(-1)?.d||'').filter(Boolean).sort();
+ const last=latestAll.at(-1)||'';
+ const endIdx=dates.indexOf(last);
+ const range=endIdx>=period?dates.slice(endIdx-period,endIdx+1):[];
+ const priceEnd=range.at(-1)||last;
+ const summary=document.getElementById('priceFreshSummary');
+ const rows=document.getElementById('priceFreshRows');
+ if(!range.length){summary.textContent='Precios diarios aún no disponibles en la instantánea. Actualiza para cargar los cierres publicados.';elem.innerHTML='<div class="empty">Cargando cotizaciones oficiales de fin de sesión…</div>';rows.innerHTML='';return;}
+ const valid=[];
+ const traces=[];
+ for(const a of arr){
+   const prices=new Map((a.pricesDaily||[]).filter(v=>v.d&&Number(v.close)>0).map(v=>[v.d,v]));
+   const raw=range.map(d=>prices.get(d));
+   const ok=raw.every(x=>x&&x.src===raw[0].src);
+   const anchor=raw[0];
+   const end=raw.at(-1);
+   if(ok&&Number(anchor.close)>0){
+     valid.push(a.id);
+     traces.push({x:range,y:raw.map(x=>(Number(x.close)/Number(anchor.close)-1)*100),type:'scatter',mode:'lines+markers',name:a.name,line:{color:a.color,width:2.6},marker:{size:5},connectgaps:false,hovertemplate:'<b>'+a.name+'</b><br>%{x|%d/%m/%Y}<br>%{y:+.2f}%<extra></extra>'});
+   }
+ }
+ const closed=DB.freshness?.lastClosedSession||priceEnd;
+ const missing=arr.filter(a=>!valid.includes(a.id)).map(a=>a.name);
+ summary.innerHTML='<span><strong>Precio al '+dateES(priceEnd)+'</strong> · '+period+' '+(period===1?'sesión bursátil':'sesiones bursátiles')+'</span><span>'+valid.length+'/8 ETF con cierre comparable</span>'+(priceEnd<closed?'<span>Precio pendiente desde '+dateES(priceEnd)+'</span>':'')+(missing.length?'<span>No comparables: '+missing.join(', ')+'</span>':'');
+ const mobile=window.innerWidth<680;
+ if(traces.length){
+   Plotly.react(elem,traces,{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:'#aebfd5',size:mobile?10:11},height:mobile?370:330,autosize:true,margin:{t:12,r:12,b:mobile?90:56,l:55},hovermode:'x unified',xaxis:{type:'date',tickformat:'%d %b',gridcolor:'#27394d',nticks:mobile?5:11,automargin:true},yaxis:{ticksuffix:'%',tickformat:'+.1f',gridcolor:'#27394d',zeroline:true,zerolinecolor:'#70839f',automargin:true},legend:{orientation:'h',x:0,y:mobile?-0.30:-0.20,font:{size:mobile?9:10}},showlegend:true},{responsive:true,displayModeBar:false});
+ } else elem.innerHTML='<div class="empty">No hay suficientes cierres comparables para este período.</div>';
+ rows.innerHTML=arr.map(a=>{
+   const p=(a.pricesDaily||[]).at(-1),d=p?.d,price=p?.close;
+   const cal=dates;const idx=cal.indexOf(d);const yesterday=idx>0?cal[idx-1]:null;
+   const prev=(a.pricesDaily||[]).find(v=>v.d===yesterday);
+   const pct=prev?.close>0&&price>0?(price/prev.close-1)*100:null;
+   const lastFlow=(a.daily||[]).filter(v=>v.d&&v.flow!=null&&Number(v.spanDays||1)===1).sort((x,y)=>x.d.localeCompare(y.d)).at(-1);
+   const stale=!!(lastFlow?.d&&d&&lastFlow.d<d);
+   const source=lastFlow?.src?.includes('Private Wealth')?'Private Wealth Daily · redondeado':(lastFlow?.verifiedBy||lastFlow?.src||'No disponible');
+   return '<div class="price-market"><div class="price-market-head"><i class="price-market-color" style="background:'+a.color+'"></i>'+a.name+'</div>'+
+     '<strong>Cierre '+dateES(d)+': '+(Number.isFinite(Number(price))?fmtP(Number(price))+' USD':'—')+'</strong>'+
+     '<small class="'+(pct!=null&&pct>=0?'price-up':'price-down')+'">Última sesión: '+(pct==null?'—':sym(pct)+fmtP(pct)+'%')+'</small>'+
+     '<small>Flujo confirmado: '+dateES(lastFlow?.d)+(stale?' · anterior al precio':'')+'</small>'+
+     '<small>Fuente del flujo: '+source+'</small></div>';
+ }).join('');
+}
+const prior=redraw;
+redraw=function(){prior();drawLatestPrices();};
+document.getElementById('priceRangeSelect').addEventListener('change',drawLatestPrices);
+})();
+
 </script></body></html>
