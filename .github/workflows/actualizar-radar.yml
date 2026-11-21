@@ -2,8 +2,9 @@ name: Actualizar Radar de Capital
 on:
   workflow_dispatch:
   schedule:
-    # De lunes a viernes a las 09:17 UTC; puede haber demoras.
-    - cron: '17 9 * * 1-5'
+    # Reintentos para datos de cierre y publicación tardía, también sábado.
+    - cron: '20 22 * * 1-5'
+    - cron: '30 0,5,10,15 * * 1-6'
 permissions:
   contents: write
 concurrency:
@@ -12,173 +13,402 @@ concurrency:
 jobs:
   actualizar:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Instalar dependencias
-        run: python -m pip install requests
-      - name: Actualizar ETF, COT y rentabilidades
+      - name: Instalar dependencias (gratuitas)
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5' 'exchange-calendars>=4.8,<5'
+      - name: Actualizar datos confirmados y conservar revisiones
         shell: bash
         run: |
           python - <<'PYRADAR'
           #!/usr/bin/env python3
-          """Updates public fund flows, CFTC positions and ETF monthly returns.
-
-          Run from repository root: python scripts/update_data.py
-          Data sources and their limits are documented in README.md.
+          """Refresh the existing Radar snapshot, preserving history and provenance.
+          
+          No credentials or paid APIs. End-of-day flows are distinct from secondary-market
+          price/volume. Exchange calendar is authoritative (XNYS via exchange_calendars).
           """
           from __future__ import annotations
+          
           import csv
           import io
           import json
           import os
           import re
-          from datetime import datetime, timezone
+          import sys
+          from datetime import datetime, timedelta, timezone
           from pathlib import Path
+          from urllib.parse import quote
+          
           import requests
-
+          import exchange_calendars as xcals
+          from bs4 import BeautifulSoup
+          
           ROOT = Path.cwd()
           OUT = ROOT / 'data' / 'snapshot.json'
-          TICKERS = ['SPY','QQQM','SOXX','IEUR','SHY','TLT','GLD','IAU','IBIT']
+          TICKERS = ['SPY', 'QQQM', 'SOXX', 'IEUR', 'SHY', 'TLT', 'GLD', 'IAU', 'IBIT']
+          PRICE_TICKERS = ['SPY', 'QQQM', 'SOXX', 'IEUR', 'SHY', 'TLT', 'GLD', 'IBIT']
           COT = {
-              'SPY': ('sp500-emini.tff.csv','net_asset_mgr_pct_oi'),
-              'QQQM': ('nasdaq-emini.tff.csv','net_asset_mgr_pct_oi'),
-              'SHY': ('2-year-treasury.tff.csv','net_asset_mgr_pct_oi'),
-              'TLT': ('30-year-treasury.tff.csv','net_asset_mgr_pct_oi'),
-              'ORO': ('gold.disagg.csv','net_m_money_pct_oi'),
-              'IBIT': ('bitcoin.tff.csv','net_asset_mgr_pct_oi'),
+              'SPY': ('sp500-emini.tff.csv', 'net_asset_mgr_pct_oi'),
+              'QQQM': ('nasdaq-emini.tff.csv', 'net_asset_mgr_pct_oi'),
+              'SHY': ('2-year-treasury.tff.csv', 'net_asset_mgr_pct_oi'),
+              'TLT': ('30-year-treasury.tff.csv', 'net_asset_mgr_pct_oi'),
+              'ORO': ('gold.disagg.csv', 'net_m_money_pct_oi'),
+              'IBIT': ('bitcoin.tff.csv', 'net_asset_mgr_pct_oi'),
           }
-          SESS = requests.Session()
-          SESS.headers.update({'User-Agent':'RadarRotacionCapital/1.0 (public research; sources credited)', 'Accept':'application/json,text/csv,*/*'})
-
-          def get(url: str, *, parse: str = 'json'):
-              r = SESS.get(url, timeout=35)
+          ETF_URL = 'https://etfiq.com/data/flows/funds/{}.json'
+          SECONDARY_URL = 'https://www.privatewealthdaily.com/etf/{}?r=1m'
+          CAL = xcals.get_calendar('XNYS')
+          SESSION = requests.Session()
+          SESSION.headers.update({'User-Agent': 'RadarCapital/4.0 (research, non-commercial polling)', 'Accept': 'application/json,text/csv,text/html,*/*', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache'})
+          
+          
+          def now_utc():
+              return datetime.now(timezone.utc)
+          
+          
+          def nyse_sessions(now=None, lookback_days=660):
+              now = now or now_utc()
+              # NYSE closes 16:00 America/New_York, incl. holiday half-days.
+              sessions = CAL.sessions_in_range((now - timedelta(days=lookback_days)).date().isoformat(), now.date().isoformat())
+              return [s.date().isoformat() for s in sessions if CAL.session_close(s).to_pydatetime() <= now]
+          
+          
+          def get(url, *, kind='json', timeout=22):
+              # Force revalidation across intermediary caches; no timestamp query required
+              # where publisher's origin caches by path. We never equate fetch time and data date.
+              r = SESSION.get(url, timeout=timeout, headers={'Cache-Control':'no-cache', 'Pragma':'no-cache'})
               r.raise_for_status()
-              return r.json() if parse == 'json' else r.text
-
-          def month_of(s: str) -> str:
-              return s[:7]
-
-          def merge_etfiq(asset: dict, doc: dict):
-              if not doc.get('months') or doc.get('ticker') != asset.get('ticker'):
-                  return
-              previous = {v['d']: v for v in asset.get('daily', []) if 'd' in v}
-              previous.update({v['d']: {'d': v['d'], 'flow': float(v['flow']), 'src': v.get('src', 'daily'), 'spanDays': v.get('spanDays', 1)}
-                               for v in doc.get('daily', []) if v.get('flow') is not None and v.get('d')})
-              asset['daily'] = [previous[k] for k in sorted(previous) if k >= '2025-01-01']
-              old_months = {v['m']: v for v in asset.get('monthly', []) if v.get('m')}
-              for v in doc['months']:
-                  if v.get('flow') is None or not re.fullmatch(r'20\d\d-\d\d', v['m']): continue
-                  # Exclude N-PORT 'series' values (includes mutual fund share classes).
-                  if v.get('scope') == 'series':
+              return r.json() if kind == 'json' else r.text
+          
+          
+          def valid_flow(v, sessions):
+              try:
+                  d = v['d']; value = float(v['flow'])
+                  return d in sessions and value == value and abs(value) < 2e12 and int(v.get('spanDays',1)) == 1
+              except (TypeError, KeyError, ValueError, OverflowError):
+                  return False
+          
+          
+          def lag_sessions(calendar, last):
+              if not last or last not in calendar:
+                  return None
+              return len(calendar) - 1 - calendar.index(last)
+          
+          
+          def normalized(v, provider, url, checked):
+              return {'d':v['d'], 'flow':float(v['flow']), 'spanDays':1,
+                      'src':provider, 'url':url, 'retrievedAt':checked,
+                      'precision':'rounded' if v.get('approx') else 'exact',
+                      **({'displayFlow':v.get('displayFlow','')} if v.get('approx') else {})}
+          
+          
+          def same_value(a,b):
+              return float(a.get('flow',float('nan'))) == float(b.get('flow',float('nan'))) and a.get('precision','exact') == b.get('precision','exact')
+          
+          
+          def merge_daily(asset, records, *, provider, url, checked, calendar, revisions):
+              stored={v['d']:v for v in asset.get('daily',[]) if v.get('d')}
+              new=0
+              for raw in records:
+                  if not valid_flow(raw,calendar):
                       continue
-                  old_months[v['m']] = {'m':v['m'],'flow':float(v['flow']), 'src':v.get('src','ETFIQ')}
-              asset['monthly'] = [old_months[k] for k in sorted(old_months)]
-              asset['asOf'] = max(doc.get('asOf', ''), asset.get('asOf', ''))
-              asset['source'] = 'ETFIQ (suscripciones y reembolsos ETF)'
-
-
-          def sum_funds(target: dict, docs: list[dict]):
-              monthly = {}
-              common = None
-              for doc in docs:
-                  m={x['m']: x for x in doc.get('months',[]) if x.get('flow') is not None and x.get('scope')!='series'}
-                  common = set(m) if common is None else common & set(m)
-              for m in sorted(common or []):
-                  monthly[m]={'m':m,'flow':sum(next(v['flow'] for v in d['months'] if v['m']==m) for d in docs), 'src':'ETFIQ GLD+IAU'}
-              old = {v['m']:v for v in target.get('monthly',[])}
-              old.update(monthly)
-              target['monthly'] = [old[k] for k in sorted(old)]
-              common=None; per=[]
-              for doc in docs:
-                  d={x['d']:x for x in doc.get('daily',[]) if x.get('flow') is not None}
-                  per.append(d)
-                  common=set(d) if common is None else common & set(d)
-              older={v['d']:v for v in target.get('daily',[])}
-              for d in sorted(common or []):
-                  v=[p[d] for p in per]
-                  older[d]={'d':d,'flow':sum(float(q['flow']) for q in v), 'src':'GLD+IAU','spanDays':max(int(q.get('spanDays',1)) for q in v)}
-              target['daily']=[older[d] for d in sorted(older)]
-              target['asOf']=min(d.get('asOf','') for d in docs)
-
-
-          def update_cot(asset: dict, filename: str, col: str):
-              rows=list(csv.DictReader(io.StringIO(get('https://futuresbench.com/data/cot/'+filename,parse='text'))))
-              vals={r['report_date']: float(r[col]) for r in rows if r.get(col) not in (None,'') and r.get('report_date')}
-              # One value per week, plus month-end snapshot; no false daily reporting.
-              asset['cotWeekly']=[{'d':d,'value':vals[d]} for d in sorted(vals) if d >= '2025-01-01']
-              asset['cotAsOf']=max(vals)
-              asset['cotSource']='CFTC Commitments of Traders / FuturesBench; % open interest'
-
-
-          def update_prices(asset: dict):
-              sym=asset.get('priceTicker')
-              if not sym:return
-              # Yahoo prices may be blocked in CI; keep previous values if absent.
-              url=f'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=8y&interval=1mo'
-              j=get(url)
-              q=j['chart']['result'][0]
-              closes=q['indicators'].get('adjclose',[{}])[0].get('adjclose') or q['indicators']['quote'][0]['close']
-              data={datetime.fromtimestamp(t,timezone.utc).strftime('%Y-%m'): p for t,p in zip(q['timestamp'], closes) if p and p>0}
-              keys=sorted(data)
-              out={}
-              for i in range(1,len(keys)):
-                  # Require consecutive months.
-                  a,b=keys[i-1],keys[i]
-                  yy,mm=map(int,a.split('-')); expect=f'{yy+(mm==12):04d}-{mm%12+1:02d}'
-                  if b==expect:
-                      out[b]=(data[b]/data[a]-1)*100
-              asset['returnsMonthly']=[{'m':k,'value':out[k]} for k in sorted(out)]
-              asset['priceAsOf']=q['meta'].get('regularMarketTime')
-
-
-          def main():
-              if not OUT.exists():
-                  # First run: recover the original historical data embedded in the site.
-                  html = (ROOT / 'index.html').read_text('utf-8')
-                  match = re.search(r'<script>const EMBEDDED\s*=\s*(\{.*?\});?</script>', html, re.S)
-                  if not match:
-                      raise SystemExit('Cannot initialize historical snapshot from index.html')
-                  OUT.parent.mkdir(parents=True, exist_ok=True)
-                  OUT.write_text(json.dumps(json.loads(match.group(1)), ensure_ascii=False), encoding='utf-8')
-              data=json.loads(OUT.read_text('utf-8'))
-              assets={a['id']:a for a in data['assets']}
-              succeeded=[]; failed=[]; docs={}
-              for t in TICKERS:
+                  row=normalized(raw, provider, url, checked)
+                  d=row['d']; old=stored.get(d)
+                  if old is not None:
+                      # Rounded public fallback must NEVER replace the exact source datum.
+                      if row['precision']=='rounded' and old.get('precision','exact')=='exact':
+                          continue
+                      if same_value(old,row):
+                          continue
+                      revisions.append({'asset':asset['id'],'field':'daily.flow','date':d,
+                                        'old':old.get('flow'), 'new':row['flow'],
+                                        'oldSource':old.get('src'),'newSource':provider,'at':checked})
+                  stored[d]=row;new+=1
+              asset['daily']=[stored[k] for k in sorted(stored)]
+              asset['asOf']=max((v['d'] for v in asset['daily'] if valid_flow(v,calendar)),default=asset.get('asOf',''))
+              return new
+          
+          
+          def merge_monthly(asset, doc, checked, revisions):
+              existing={x['m']:x for x in asset.get('monthly',[]) if x.get('m')}
+              for v in doc.get('months',[]):
                   try:
-                      doc=get(f'https://etfiq.com/data/flows/funds/{t.lower()}.json')
-                      if doc.get('ticker') != t:raise ValueError('Unexpected ticker')
-                      docs[t]=doc
-                      if t not in ('GLD','IAU'):
-                          merge_etfiq(assets[t],doc)
-                      succeeded.append('ETFIQ '+t)
+                      if v.get('scope')=='series' or not re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])',v['m']) or v.get('flow') is None:continue
+                      value=float(v['flow']); m=v['m']; old=existing.get(m)
+                      if old and old.get('flow')!=value:
+                          revisions.append({'asset':asset['id'],'field':'monthly.flow','date':m,
+                                            'old':old.get('flow'),'new':value,'oldSource':old.get('src'),
+                                            'newSource':'ETFIQ','at':checked})
+                      existing[m]={'m':m,'flow':value,'src':v.get('src','ETFIQ'), 'retrievedAt':checked}
+                  except (ValueError, TypeError, KeyError):continue
+              asset['monthly']=[existing[k] for k in sorted(existing)]
+          
+          
+          def parse_rounded_flow(text):
+              """Published, rounded amounts; not an inferred/estimated flow."""
+              txt=text.replace('\xa0','').replace(',','').replace('−','-').replace('▲','').replace('▼','').replace(' ','').strip()
+              match=re.fullmatch(r'([+-]?)\$?([\d]+(?:\.\d+)?)([KMBT]?)',txt,re.I)
+              if not match:return None
+              sign=-1 if match.group(1)=='-' else 1
+              val=float(match.group(2))*{'':1,'K':1e3,'M':1e6,'B':1e9,'T':1e12}[match.group(3).upper()]
+              # Treat publisher's "$0" as indeterminate when the view rounds off small flows.
+              if val==0:return None
+              return sign*val
+          
+          
+          def parse_publication_date(text):
+              try: return datetime.strptime(text.strip(),'%b %d, %Y').date().isoformat()
+              except ValueError: return None
+          
+          
+          def parse_secondary_html(html, ticker, calendar):
+              """Strictly parse dated daily flow table, never price or weekly totals.
+          
+              This source publishes rounded dollar flows. Its fallback is labelled as such.
+              If markup changes or date provenance cannot be established, return no data.
+              """
+              soup=BeautifulSoup(html,'html.parser')
+              title=(soup.title.get_text(' ',strip=True) if soup.title else '')
+              if not re.match(r'^'+re.escape(ticker)+r'\s*(?:[—|\-:])', title, re.I):return []
+              text=soup.get_text(' ',strip=True)
+              hdr=re.search(r'Price through\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*[·|\-]\s*Flows through\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})',text,re.I)
+              if not hdr:return []
+              asof=parse_publication_date(hdr.group(2))
+              if not asof or asof not in calendar:return []
+              parsed=[]
+              for heading in soup.find_all(re.compile('^h[1-6]$')):
+                  if not re.search(r'Daily net flows',heading.get_text(' ',strip=True),re.I):
+                      continue
+                  table=heading.find_next('table')
+                  if table is None:continue
+                  next_heading=heading.find_next(re.compile('^h[1-6]$'))
+                  if next_heading and table.sourceline and next_heading.sourceline and table.sourceline > next_heading.sourceline:continue
+                  header=table.find('tr')
+                  if not header or 'Label' not in header.get_text(' ',strip=True) or 'Value' not in header.get_text(' ',strip=True):continue
+                  for tr in table.find_all('tr')[1:]:
+                      td=tr.find_all(['td','th'])
+                      if len(td)<2:continue
+                      m=re.fullmatch(r'([A-Za-z]{3})\s+(\d{1,2})(?:,\s*(\d{4}))?',td[0].get_text(' ',strip=True))
+                      if not m:continue
+                      y=int(m.group(3)) if m.group(3) else int(asof[:4]);month=datetime.strptime(m.group(1).title(),'%b').month;day=int(m.group(2))
+                      try:d=f'{y:04d}-{month:02d}-{day:02d}';dt=datetime.strptime(d,'%Y-%m-%d').date()
+                      except ValueError:continue
+                      # Year rollover: e.g. report Jan 2027 includes Dec 2026.
+                      if d>asof and not m.group(3):d=f'{y-1:04d}-{month:02d}-{day:02d}'
+                      if d not in calendar or d>asof:continue
+                      display=td[1].get_text(' ',strip=True)
+                      amount=parse_rounded_flow(display)
+                      if amount is not None:parsed.append({'d':d,'flow':amount,'approx':True,'displayFlow':display,'spanDays':1})
+                  if parsed:break
+              return sorted({r['d']:r for r in parsed}.values(),key=lambda v:v['d'])
+          
+          
+          def verify_secondary_overlap(primary, secondary):
+              """Only mix methods if shared daily creations agree within displayed rounding.
+          
+              >=2 overlapping, nonzero published observations; do not infer from volume.
+              """
+              exact={v['d']:v for v in primary if v.get('flow') is not None}
+              shared=[(exact[v['d']],v) for v in secondary if v.get('d') in exact]
+              shared=shared[-15:]
+              if len(shared)<2:return False
+              passing=0
+              for a,b in shared:
+                  actual=float(a['flow']);reported=float(b['flow'])
+                  display=b.get('displayFlow','')
+                  m=re.search(r'(\d+(?:\.(\d+))?)([KMBT])',display,re.I)
+                  if not m:continue
+                  step={'K':1e3,'M':1e6,'B':1e9,'T':1e12}[m.group(3).upper()]*(10**(-len(m.group(2) or '')))
+                  tol=max(step*0.51,abs(actual)*0.015)
+                  if (actual*reported>0) and abs(actual-reported)<=tol:passing+=1
+              return passing>=2 and passing>=len(shared)*0.75
+          
+          
+          def get_etfiq(t,calendar,checked):
+              url=ETF_URL.format(t.lower());doc=get(url)
+              if doc.get('ticker')!=t:raise ValueError(f'Unexpected ETFIQ ticker for {t}')
+              vals=[r for r in doc.get('daily',[]) if valid_flow(r,calendar)]
+              return doc,vals
+          
+          
+          def fetch_price_stooq(t, calendar):
+              url=f'https://stooq.com/q/d/l/?s={t.lower()}.us&i=d&d1=20250101&d2={calendar[-1].replace("-", "")}'
+              raw=get(url,kind='text')
+              rows=list(csv.DictReader(io.StringIO(raw)))
+              if not rows or 'Date' not in rows[0] or 'Close' not in rows[0]:raise ValueError('Missing Stooq daily CSV columns')
+              out={}
+              for r in rows:
+                  try:
+                      d=r['Date']; v=float(r['Close'])
+                      if d in calendar and v>0:out[d]={'d':d,'close':v,'src':'Stooq', 'url':url}
+                  except (TypeError,ValueError,KeyError):continue
+              if len(out)<12:raise ValueError('Too few Stooq sessions')
+              if max(out)<calendar[-1]:raise ValueError('Stooq close lags latest NYSE session; trying daily Yahoo')
+              return out
+          
+          
+          def fetch_price_yahoo(t,calendar):
+              url=f'https://query1.finance.yahoo.com/v8/finance/chart/{quote(t)}?range=2y&interval=1d'
+              j=get(url)
+              q=j['chart']['result'][0];prices=q['indicators']['quote'][0]['close'];out={}
+              for date,p in zip(q['timestamp'],prices):
+                  if p is None or p<=0:continue
+                  d=datetime.fromtimestamp(date,timezone.utc).date().isoformat()
+                  if d in calendar:out[d]={'d':d,'close':round(float(p),6),'src':'Yahoo Finance EOD', 'url':url}
+              if len(out)<12:raise ValueError('Too few Yahoo EOD records')
+              return out
+          
+          
+          def merge_prices(a,rows,checked,revisions, calendar):
+              old={v['d']:v for v in a.get('pricesDaily',[]) if v.get('d')}
+              for d,v in rows.items():
+                  prior=old.get(d)
+                  if prior and abs(prior['close']-v['close'])>0.00001:
+                      revisions.append({'asset':a['id'],'field':'pricesDaily.close','date':d,'old':prior['close'],'new':v['close'],'oldSource':prior.get('src'),'newSource':v['src'],'at':checked})
+                  if not prior or abs(prior['close']-v['close'])>0.00001:old[d]={**v,'retrievedAt':checked}
+              a['pricesDaily']=[old[k] for k in sorted(old) if k in calendar][-425:]
+              a['priceAsOf']=max(old,default='')
+              a['priceSource']=(rows.get(max(rows),{}).get('src') if rows else a.get('priceSource',''))
+          
+          
+          def merge_gold(assets, gold_docs, calendar, checked, revisions):
+              a=assets['ORO'];g=gold_docs.get('GLD',{});i=gold_docs.get('IAU',{})
+              # Compose only dates for which both underlying funds have confirmed daily flows.
+              dg={v['d']:v for v in g.get('daily',[]) if valid_flow(v,calendar)}
+              di={v['d']:v for v in i.get('daily',[]) if valid_flow(v,calendar)}
+              common=sorted(set(dg)&set(di))
+              rows=[]
+              for d in common:
+                  v,w=dg[d],di[d]
+                  rows.append({'d':d,'flow':float(v['flow'])+float(w['flow']),'spanDays':1,'approx':v.get('approx') or w.get('approx'), 'displayFlow':'GLD + IAU'})
+              merge_daily(a,rows,provider='GLD+IAU (ETFIQ/PWD)',url='https://etfiq.com/data/',checked=checked,calendar=calendar,revisions=revisions)
+              a['source']='GLD+IAU: creaciones/redenciones ETF (no oro físico total)'
+          
+          
+          def update_cot(asset, name, field):
+              url='https://futuresbench.com/data/cot/'+name
+              parsed=list(csv.DictReader(io.StringIO(get(url,kind='text'))))
+              val={x['report_date']:float(x[field]) for x in parsed if x.get(field) not in (None,'') and x.get('report_date')}
+              if not val:raise ValueError('Empty COT')
+              asset['cotWeekly']=[{'d':d,'value':val[d]} for d in sorted(val) if d>='2025-01-01']
+              asset['cotAsOf']=max(val);asset['cotSource']='CFTC/FuturesBench, % open interest'
+          
+          
+          def load_data():
+              if OUT.exists():return json.loads(OUT.read_text('utf-8'))
+              # For a fresh clone only: recover previously embedded snapshot without rewriting the site.
+              html=(ROOT/'index.html').read_text('utf-8')
+              m=re.search(r'<script>const EMBEDDED\s*=\s*(\{.*?\});?</script>',html,re.S)
+              if not m:raise RuntimeError('Initial historical snapshot unavailable')
+              return json.loads(m.group(1))
+          
+          
+          def main():
+              checked=now_utc().isoformat(timespec='seconds')
+              calendar=nyse_sessions()
+              if not calendar:raise RuntimeError('NYSE calendar empty')
+              closed=calendar[-1];data=load_data()
+              assets={a['id']:a for a in data['assets']}
+              revisions=[];done=[];errors=[];docs={};source_status={}
+              for ticker in TICKERS:
+                  state={'ETFIQ':'pending','PWD':'not_used','lastConsulted':checked}
+                  try:
+                      doc,vals=get_etfiq(ticker,calendar,checked)
+                      state['ETFIQ']='ok';docs[ticker]=doc
+                      if ticker not in ('GLD','IAU'):
+                          added=merge_daily(assets[ticker],vals,provider='ETFIQ',url=ETF_URL.format(ticker.lower()),checked=checked,calendar=calendar,revisions=revisions)
+                          merge_monthly(assets[ticker],doc,checked,revisions)
+                          done.append(f'ETFIQ {ticker}: {len(vals)} confirmed, {added} changed')
                   except Exception as e:
-                      failed.append(f'ETFIQ {t}: {e}')
+                      state['ETFIQ']='technical_error'; errors.append(f'ETFIQ {ticker}: {e}')
+                  # Secondary only for dates newer than ETFIQ, with rounded published precision.
+                  try:
+                      page=get(SECONDARY_URL.format(ticker),kind='text')
+                      rows=parse_secondary_html(page,ticker,calendar)
+                      if rows:
+                          state['PWD']='ok'
+                          exactPrimary=[v for v in docs.get(ticker,{}).get('daily',[]) if valid_flow(v,calendar)]
+                          compatible=verify_secondary_overlap(exactPrimary,rows)
+                          if not compatible:
+                              state['PWD']='overlap_not_verified'
+                              rows=[]
+                          if ticker not in ('GLD','IAU') and compatible:
+                              prior=assets[ticker].get('asOf','')
+                              newer=[v for v in rows if v['d']>prior]
+                              added=merge_daily(assets[ticker],newer,provider='Private Wealth Daily (redondeado)',url=SECONDARY_URL.format(ticker),checked=checked,calendar=calendar,revisions=revisions)
+                              if added:done.append(f'PWD {ticker}: {added} newer public rounded records')
+                          if compatible:docs.setdefault(ticker,{})['secondaryDaily']=rows
+                      else:state['PWD']='no_verifiable_daily_data'
+                  except Exception as e:
+                      state['PWD']='technical_error'; errors.append(f'PWD {ticker}: {e}')
+                  source_status[ticker]=state
+              # For gold use a uniform source for BOTH GLD and IAU on each date.
               if 'GLD' in docs and 'IAU' in docs:
-                  try: sum_funds(assets['ORO'],[docs['GLD'],docs['IAU']]);succeeded.append('ETF oro agregado')
-                  except Exception as e:failed.append(f'ETF oro agregado: {e}')
-              for t,(file,col) in COT.items():
-                  try: update_cot(assets[t],file,col);succeeded.append('COT '+t)
-                  except Exception as e:failed.append(f'COT {t}: {e}')
-              for t in ['SPY','QQQM','SOXX','IEUR','SHY','TLT','ORO','IBIT']:
-                  try: update_prices(assets[t]);succeeded.append('Precio '+t)
-                  except Exception as e:failed.append(f'Precio {t}: {e}')
-              data['refreshDate']=datetime.now(timezone.utc).isoformat(timespec='seconds')
-              data['lastSuccess']=succeeded
-              data['lastErrors']=failed
-              tmp=OUT.with_suffix('.tmp')
-              tmp.write_text(json.dumps(data,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
-              os.replace(tmp,OUT)
-              print('Updated:',len(succeeded),'errors:',len(failed))
-              for e in failed: print('WARN',e)
-              if not succeeded:
-                  raise SystemExit('Nothing updated; refusing to report fresh data')
-
+                  gold_docs={}
+                  for tick in ('GLD','IAU'):
+                      doc=docs[tick]
+                      raw=[v for v in doc.get('daily',[]) if valid_flow(v,calendar)]
+                      by_date={v['d']:v for v in raw}
+                      for v in doc.get('secondaryDaily',[]):
+                          if v['d']>max(by_date,default=''):
+                              by_date[v['d']]=v
+                      gold_docs[tick]={'daily':list(by_date.values())}
+                  merge_gold(assets,gold_docs,calendar,checked,revisions)
+              else:
+                  errors.append('Gold aggregate: incomplete issuer pair; retained prior snapshot')
+              for ticker in PRICE_TICKERS:
+                  a=assets['ORO'] if ticker=='GLD' else assets[ticker]
+                  try:
+                      try:rows=fetch_price_stooq(ticker,calendar)
+                      except Exception as e:
+                          errors.append(f'Stooq {ticker}: {e}; attempting Yahoo')
+                          rows=fetch_price_yahoo(ticker,calendar)
+                      merge_prices(a,rows,checked,revisions,calendar)
+                      done.append(f'Prices {ticker}: {len(rows)} daily closes')
+                  except Exception as e:errors.append(f'Price {ticker}: {e}')
+              for ticker,(filename,field) in COT.items():
+                  try:update_cot(assets[ticker],filename,field);done.append('COT '+ticker)
+                  except Exception as e:errors.append(f'COT {ticker}: {e}')
+              latest=[];valid_sets=[]
+              for a in data['assets']:
+                  if a['id']=='MMF':continue
+                  valid={v['d'] for v in a.get('daily',[]) if valid_flow(v,calendar)}
+                  valid_sets.append(valid)
+                  last=max(valid,default='')
+                  latest.append(last)
+                  a['asOf']=last
+                  a['flowLagSessions']=lag_sessions(calendar,last)
+                  a['flowSourceLatest']=next((v.get('src','desconocida') for v in reversed(a['daily']) if v['d']==last),'')
+                  a['lastConsulted']=checked
+                  a['sourceStatus']=source_status.get('GLD' if a['id']=='ORO' else a['id'],{})
+              common=set.intersection(*valid_sets) if valid_sets else set()
+              data['freshness']={ 'lastClosedSession':closed,
+                                  'lastAnyFlowSession':max(latest,default=''),
+                                  'lastCommonFlowSession':max(common,default=''),
+                                  'lastConsultedAt':checked,
+                                  'calendar':'XNYS (NYSE, actual exchange sessions)',
+                                  'sessionDates':calendar[-650:],
+                                  'marketTimezone':'America/New_York',
+                                  'sourceChecks':source_status}
+              data['refreshDate']=checked
+              data['lastSuccess']=done
+              data['lastErrors']=errors
+              data['revisions']=data.get('revisions',[])+revisions
+              data['newRevisionsCount']=len(revisions)
+              OUT.parent.mkdir(parents=True,exist_ok=True)
+              tmp=OUT.with_suffix('.tmp');tmp.write_text(json.dumps(data,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8');os.replace(tmp,OUT)
+              print(f'NYSE closed={closed}; anyETF={data["freshness"]["lastAnyFlowSession"]}; commonETF={data["freshness"]["lastCommonFlowSession"]}')
+              print(f'Fetched={len(done)}; technical warnings={len(errors)}; revisions={len(revisions)}')
+              for e in errors:print('WARN',e)
+              if not done:raise SystemExit('All sources failed; preserved old verified data')
+          
           if __name__=='__main__':main()
           PYRADAR
-      - name: Guardar historico validado
+      - name: Guardar histórico auditado
         shell: bash
         run: |
           git config user.name 'Radar Capital Bot'
@@ -186,5 +416,6 @@ jobs:
           git add data/snapshot.json
           if ! git diff --cached --quiet; then
             git commit -m "Actualizar radar $(date -u +%F)"
+            git pull --rebase
             git push
           fi
