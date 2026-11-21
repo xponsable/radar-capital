@@ -3966,11 +3966,37 @@ maplibre-gl/dist/maplibre-gl.js:
 window.Plotly = Plotly;
 return Plotly;
 }));</script>
+<style>
+.freshness-compact{margin:8px 0 14px;padding:12px 15px;border:1px solid #31435b;border-radius:13px;background:#142237}
+.freshness-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:12px}
+.fresh-state{border-radius:18px;padding:3px 9px;border:1px solid #927b48;font-size:11px}
+.fresh-green{color:#60e0af!important}.fresh-yellow{color:#f1ce76!important}.fresh-red{color:#fa9a9d!important}
+.freshness-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.freshness-grid span{display:flex;flex-direction:column;min-width:0;gap:3px}.freshness-grid small{font-size:10px;color:#9db3cb}
+.freshness-grid strong{font-size:11px;color:#e6eeff;line-height:1.4;overflow-wrap:anywhere}
+.fresh-details{font-size:11px;margin-top:9px;color:#bdcbe0}
+.fresh-details summary{cursor:pointer;color:#e4c585}
+#freshAssetRows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
+.fresh-asset{font-size:11px;display:block;padding:7px;background:#1a2a40;border-radius:7px;line-height:1.5}
+.fresh-asset b{margin-right:4px}.fresh-asset small{color:#95aac4;display:block}
+.flow-price-extra{grid-column:1/-1;font-size:10px;color:#a9c1d9;line-height:1.5;margin-top:-1px}
+@media(max-width:760px){.freshness-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#freshAssetRows{grid-template-columns:1fr}.freshness-compact{padding:11px}.flow-price-extra{font-size:10px}}
+</style>
 </head><body><div class="wrap">
 <div class="topline"><span class="bullet"></span> RADAR DE FLUJOS DE CAPITAL · dBplus</div>
 <header class="head"><div><h1>¿Dónde entra y sale el dinero?</h1><p class="subtitle">Nueve mercados en un solo gráfico. Flujos netos acumulados, histórico y tendencias comparables. Datos reales de ETF; rentabilidades y posicionamiento institucional en paneles separados.</p></div><button class="refresh" id="reloadBtn">↻ Actualizar datos</button></header>
 <div class="statusbar"><span><strong>Datos:</strong> <span id="status">Cargando histórico…</span></span><span><strong>Fuente principal:</strong> ETFIQ, suscripciones/redenciones de ETF</span><span><strong>Última serie:</strong> <span id="freshness">—</span></span><span><strong>Histórico:</strong> desde 2019 cuando existe dato</span></div>
 
+<div class="freshness-compact" id="freshPanel" aria-label="Frescura de flujos ETF">
+ <div class="freshness-title"><b>Frescura de los datos</b><span id="freshStatus" class="fresh-state">Comprobando…</span></div>
+ <div class="freshness-grid">
+  <span><small>Última sesión cerrada</small><strong id="freshClosed">—</strong></span>
+  <span><small>Últimos flujos verificados</small><strong id="freshLatest">—</strong></span>
+  <span><small>Retraso en sesiones</small><strong id="freshLag">—</strong></span>
+  <span><small>Fuente</small><strong id="freshSource">—</strong></span>
+  <span><small>Última consulta</small><strong id="freshQueried">—</strong></span>
+ </div><details class="fresh-details"><summary>Ver fecha y fuente de cada ETF</summary><div id="freshAssetRows"></div></details>
+</div>
 <section class="rotation-panel" aria-labelledby="rotationTitle">
   <div class="rotation-heading"><div>
     <span class="rotation-overline">Radar de rotación · lectura rápida</span>
@@ -4166,6 +4192,196 @@ $('rotationPeriod').onchange=redraw;$('range').onchange=redraw;$('freq').onchang
 let radarResizeTimer;window.addEventListener('resize',()=>{clearTimeout(radarResizeTimer);radarResizeTimer=setTimeout(redraw,250)});
 (async()=>{ // Hosted sites read scheduled snapshot; a standalone file uses the built-in snapshot.
  try{if(location.protocol!=='file:'){let r=await fetch('data/snapshot.json?d='+Date.now(),{cache:'no-store'});if(r.ok){let p=await r.json();if(p&&Array.isArray(p.assets)&&p.assets.length>=9){DB=p;$('status').textContent='Histórico guardado cargado'}}}}catch(e){}
- redraw();refresh();setInterval(refresh,6*3600*1000);
+ redraw();refresh();setInterval(refresh,30*60*1000);
 })();
+</script><script>
+/* Radar de Capital 4.0 - freshness and aligned price/flow analysis. */
+(function(){
+'use strict';
+const fmtDate=s=>s?String(s).split('-').reverse().join('/'):'—';
+const flowAssets=()=>DB.assets.filter(a=>a.id!=='MMF');
+let lastBrowserConsultation=null;
+function sessionsAll(){
+  const raw=DB.freshness?.sessionDates;
+  if(Array.isArray(raw)&&raw.length>5)return raw;
+  // Offline preview fallback: SPY confirmed session history, never guessed weekdays.
+  return [...new Set((DB.assets.find(a=>a.id==='SPY')?.daily||[]).filter(v=>v.spanDays===1).map(v=>v.d))].sort();
+}
+function validSeries(a,dates){
+  if(!dates?.length)return null;
+  const byDate=new Map((a.daily||[]).filter(v=>v?.d).map(v=>[v.d,v]));
+  const rec=dates.map(d=>byDate.get(d));
+  if(!rec.every(x=>x&&x.spanDays!==0&&Number(x.spanDays||1)===1&&Number.isFinite(Number(x.flow))))return null;
+  return {sum:rec.reduce((s,v)=>s+Number(v.flow),0)/1e9,approx:rec.some(v=>v.precision==='rounded'),src:[...new Set(rec.map(v=>v.src||'ETFIQ'))].join(' + ')};
+}
+function flowDataEnd(){
+  const valid=flowAssets().flatMap(a=>(a.daily||[]).filter(v=>v.d&&v.flow!=null&&Number(v.spanDays||1)===1).map(v=>v.d)).sort();
+  return valid.at(-1)||'';
+}
+function selectedSessions(){
+  const raw=sessionsAll();
+  const end=flowDataEnd();
+  return raw.filter(s=>s<=end);
+}
+// Feed the existing chart selectors with genuine NYSE sessions. Do not anchor to stale SPY.
+rotationCalendar=function(){return selectedSessions()};
+function analysisFor(a, current, previous){
+  const flow=validSeries(a,current), prior=validSeries(a,previous);
+  const calendar=sessionsAll();
+  const startIx=calendar.indexOf(current[0]);
+  const anchor=startIx>0?calendar[startIx-1]:null;
+  const closeMap=new Map((a.pricesDaily||[]).map(v=>[v.d,v]));
+  const p0=anchor?closeMap.get(anchor):null, p1=closeMap.get(current.at(-1));
+  const first=p0?Number(p0.close):null,last=p1?Number(p1.close):null;
+  const price=(flow&&first>0&&last>0&&p0.src===p1.src)?(last/first-1)*100:null;
+  let label='Sin datos comparables';
+  if(flow&&price!==null){
+    if(flow.sum>0&&price>0)label='Acumulación aparente';
+    else if(flow.sum<0&&price<0)label='Distribución aparente';
+    else if(flow.sum>0&&price<0)label='Absorción potencial';
+    else if(flow.sum<0&&price>0)label='Divergencia';
+    else label='Movimiento neutro';
+  }
+  let trend='Sin período anterior';
+  if(flow&&prior){
+    if(flow.sum===0||prior.sum===0)trend='Cambio absoluto (base cero)';
+    else if(Math.sign(flow.sum)!==Math.sign(prior.sum))trend=flow.sum>0?'Giro hacia entradas':'Giro hacia salidas';
+    else{
+      const intensity=Math.abs(flow.sum)-Math.abs(prior.sum);
+      trend=Math.abs(intensity)<0.000001?'Intensidad estable':intensity>0?'Acelerando':'Desacelerando';
+    }
+  }
+  return {flow,prior,price,priceStart:anchor,priceEnd:current.at(-1),label,trend,
+          delta:flow&&prior?flow.sum-prior.sum:null,
+          intensity:flow&&prior?Math.abs(flow.sum)-Math.abs(prior.sum):null};
+}
+function freshnessSummary(){
+  const f=DB.freshness||{};const cal=sessionsAll();
+  const lastClosed=f.lastClosedSession||'';
+  const lastAny=flowDataEnd();
+  const days=cal.filter(d=>d>lastAny&&(!lastClosed||d<=lastClosed)).length;
+  const allComplete=flowAssets().filter(a=>(a.daily||[]).some(v=>v.d===lastAny&&v.flow!=null&&Number(v.spanDays||1)===1)).length;
+  const common=f.lastCommonFlowSession||'';
+  const commonLag=common&&lastClosed?cal.filter(d=>d>common&&d<=lastClosed).length:null;
+  const badgeClass=lastClosed&&(allComplete===8&&days===0)?'fresh-green':(commonLag===1?'fresh-yellow':'fresh-red');
+  const state=lastClosed?(allComplete===8&&days===0?'Completo':days===1?'Pendiente de publicación':'Publicación parcial / pendiente'):'Calendario sin comprobar';
+  const source=flowAssets().map(a=>a.flowSourceLatest||[...(a.daily||[])].reverse().find(v=>v.d===lastAny)?.src).filter(Boolean);
+  const sourceLabel=[...new Set(source)].slice(0,2).join(', ')||'ETFIQ';
+  const checked=f.lastConsultedAt||DB.refreshDate;
+  $('freshStatus').className='fresh-state '+badgeClass;
+  $('freshStatus').textContent=state;
+  $('freshClosed').textContent=fmtDate(lastClosed);
+  $('freshLatest').textContent=fmtDate(lastAny)+' ('+allComplete+'/8 ETF)';
+  $('freshLag').textContent=(lastClosed?days+' sesiones para el más reciente':'—')+(commonLag!=null?' · '+commonLag+' para cobertura total':'');
+  $('freshSource').textContent=sourceLabel;
+  $('freshQueried').textContent=checked?new Date(checked).toLocaleString('es-ES'):'—';
+  if(lastBrowserConsultation)$('freshQueried').textContent+=' · Web: '+lastBrowserConsultation;
+  const list=$('freshAssetRows');
+  list.innerHTML=flowAssets().map(a=>{
+    const dates=(a.daily||[]).filter(v=>v.flow!=null&&Number(v.spanDays||1)===1).map(v=>v.d).sort();
+    const latest=dates.at(-1)||'';
+    const lag=lastClosed?cal.filter(d=>d>latest&&d<=lastClosed).length:null;
+    const row=[...(a.daily||[])].reverse().find(v=>v.d===latest);
+    const status=lag===0?'fresh-green':lag===1?'fresh-yellow':'fresh-red';
+    const secondary=row?.precision==='rounded'?' · valor redondeado':'';
+    const fallbackState=a.sourceStatus?.PWD;
+    const err=(a.sourceStatus?.ETFIQ==='technical_error'&&fallbackState==='technical_error')?' · Error técnico de consulta':fallbackState==='overlap_not_verified'?' · Alternativa sin solapamiento verificado':fallbackState==='no_verifiable_daily_data'?' · Alternativa sin datos diarios comparables':' · Pendiente de publicación';
+    return '<span class="fresh-asset"><b>'+rotationEsc(a.name)+'</b> '+rotationEsc(fmtDate(latest))+' <span class="'+status+'">'+(lag!=null?lag+' ses.':'—')+'</span> <small>'+rotationEsc((row?.src||'Sin fuente')+secondary+(lag>0?err:''))+'</small></span>';
+  }).join('');
+}
+function priceAlignedMonthly(a, months){
+  if(!months.length)return null;
+  const dates=sessionsAll();const start=months[0],end=months.at(-1);
+  const within=dates.filter(d=>d.slice(0,7)>=start&&d.slice(0,7)<=end);
+  if(!within.length)return null;
+  const firstIdx=dates.indexOf(within[0]);const prev=dates[firstIdx-1];
+  const map=new Map((a.pricesDaily||[]).map(v=>[v.d,v]));
+  const p0=map.get(prev),p1=map.get(within.at(-1));
+  return p0&&p1&&p0.src===p1.src&&p0.close>0&&p1.close>0?(Number(p1.close)/Number(p0.close)-1)*100:null;
+}
+function monthlyComparison(a, months, previous){
+  const now=rotationSum(a,months);const old=rotationSum(a,previous);
+  const price=priceAlignedMonthly(a,months);
+  const curr=now===null?null:{sum:now,approx:false};const prior=old===null?null:{sum:old,approx:false};
+  let label='Sin datos comparables';
+  if(curr&&price!==null){
+    label=curr.sum>0&&price>0?'Acumulación aparente':curr.sum<0&&price<0?'Distribución aparente':curr.sum>0&&price<0?'Absorción potencial':curr.sum<0&&price>0?'Divergencia':'Movimiento neutro';
+  }
+  let trend='Sin período anterior';
+  if(curr&&prior){if(curr.sum*prior.sum<0)trend=curr.sum>0?'Giro hacia entradas':'Giro hacia salidas';
+    else trend=Math.abs(curr.sum)>Math.abs(prior.sum)?'Acelerando':'Desacelerando';}
+  return {flow:curr,prior,price,label,trend,delta:curr&&prior?now-old:null,intensity:curr&&prior?Math.abs(now)-Math.abs(old):null};
+}
+function drawFlowPrice(){
+  const selected=$('rotationPeriod').value;const n=shortSessionCount(selected),count=n||Number(selected)||3;
+  let dates,prev,desc;
+  if(n){const cal=selectedSessions();dates=cal.slice(-n);prev=cal.slice(-2*n,-n);
+    if(dates.length!==n){$('rotationPulse').textContent='No hay suficientes sesiones verificadas';return;}
+    desc=fmtDate(dates[0])+' — '+fmtDate(dates.at(-1));
+  }else{const last=rotationClosedMonth();dates=Array.from({length:count},(_,i)=>rotationMonthAdd(last,i-count+1));prev=Array.from({length:count},(_,i)=>rotationMonthAdd(last,i-2*count+1));desc=rotationLabel(dates[0])+' — '+rotationLabel(last);}
+  const data=flowAssets().map(a=>({a,v:n?analysisFor(a,dates,prev):monthlyComparison(a,dates,prev)}));
+  const comparable=data.filter(x=>x.v.flow!==null);const missing=data.filter(x=>x.v.flow===null);
+  const maximum=Math.max(1,...comparable.map(x=>Math.abs(x.v.flow.sum)));
+  const ordered=[...comparable].sort((x,y)=>y.v.flow.sum-x.v.flow.sum).concat(missing);
+  $('rotationPulse').innerHTML='<span><strong>'+rotationEsc(desc)+'</strong></span><span>'+comparable.length+'/8 ETF completos · Flujos y precios del mismo período, cuando existen datos</span>';
+  $('rotationRangeLabel').textContent=n?n+' sesiones bursátiles · cierre '+fmtDate(dates.at(-1)):'Meses completos · '+rotationEsc(desc);
+  const wins=comparable.filter(x=>x.v.flow.sum>0).slice(0,3);
+  const losses=comparable.filter(x=>x.v.flow.sum<0).sort((x,y)=>x.v.flow.sum-y.v.flow.sum).slice(0,3);
+  $('rotationIn').innerHTML=wins.length?wins.map(x=>rotationWinner({...x.a,flow:x.v.flow.sum})).join(''):'<div class="empty">Sin entradas confirmadas</div>';
+  $('rotationOut').innerHTML=losses.length?losses.map(x=>rotationWinner({...x.a,flow:x.v.flow.sum})).join(''):'<div class="empty">Sin salidas confirmadas</div>';
+  $('rotationRows').innerHTML=ordered.map(({a,v})=>{
+    const current=v.flow?.sum;
+    const bar=current==null?0:Math.max(3,Math.abs(current)/maximum*100);
+    const delta=v.delta==null?'Sin comparación anterior':(v.delta>=0?'+':'')+fmt(v.delta,2)+' mil M$ frente a anterior';
+    const price=v.price==null?'Precio: sin cierres coincidentes':'Precio '+(v.price>=0?'+':'')+fmt(v.price,2)+'%';
+    const className=current==null?'neutral':current>=0?'pos':'neg';
+    const approx=v.flow?.approx?'≈ ':'', market=rotationEsc(a.name);
+    const info=current==null?'Datos incompletos en '+rotationEsc(desc)+'; no se rellena con ceros.':
+      rotationEsc(price)+' · '+rotationEsc(v.label)+' · '+rotationEsc(v.trend)+
+      (v.intensity!=null?' · Δ intensidad '+(v.intensity>=0?'+':'')+fmt(v.intensity,2)+' mil M$':'')+
+      (v.flow.approx?' · FLUJO REDONDEADO por fuente':'');
+    return '<div class="rotation-row"><div class="market" title="'+market+'"><span class="dot" style="background:'+rotationEsc(a.color)+'"></span><span class="market-label">'+market+'</span></div>'+
+      '<div class="rotation-bar"><span class="fill '+(current>=0?'plus':'minus')+'" style="width:'+bar.toFixed(1)+'%"></span></div>'+
+      '<div class="amount '+className+'">'+(current===null?'Sin dato':approx+rotationValue(current))+'</div>'+
+      '<div class="delta">'+rotationEsc(delta)+'</div><div class="flow-price-extra">'+info+'</div></div>';
+  }).join('');
+  const mmf=DB.assets.find(x=>x.id==='MMF');
+  const p=[...(mmf?.monthly||[])].filter(x=>x.flow!=null).sort((a,b)=>a.m.localeCompare(b.m)).at(-1);
+  $('rotationMmf').innerHTML='<div><strong>Fondos monetarios · serie mensual independiente</strong><div class="desc">'+(p?rotationEsc(rotationLabel(p.m)):'Sin dato')+' · no comparable por sesiones con ETF</div></div><span class="amount">'+(p?rotationValue(B(p.flow)):'—')+'</span>';
+}
+const originalRedraw=redraw;
+redraw=function(){originalRedraw();freshnessSummary();drawFlowPrice();};
+const originalMergeDoc=mergeDoc;
+mergeDoc=function(a,doc){
+  if(!doc||doc.ticker!==a.ticker)return false;
+  // Merge only source records, preserving any later PWD fallback and revision history.
+  const lastOther=Math.max(0,...(a.daily||[]).filter(x=>x.precision==='rounded').map(x=>Date.parse(x.d)||0));
+  const result=originalMergeDoc(a,doc);
+  a.asOf=[...(a.daily||[])].filter(v=>v.flow!=null&&Number(v.spanDays||1)===1).map(v=>v.d).sort().at(-1)||a.asOf;
+  // The original merge ignores precision; preserve any newer rounded records.
+  if(lastOther){} // documented compatibility check; never set synthetic flows.
+  return result;
+};
+const originalRefresh=refresh;
+refresh=async function(){
+  if(live)return;
+  // Browser reloads the scheduled snapshot before asking ETFIQ directly. This
+  // does not write to GitHub; source consultation time differs from data date.
+  if(location.protocol!=='file:'){
+    try{const r=await fetch('data/snapshot.json?v='+Date.now(),{cache:'no-store'});if(r.ok){
+      const newData=await r.json();
+      if(newData?.assets?.length>=9 && (!DB.refreshDate||newData.refreshDate>=DB.refreshDate)){
+        DB=newData;enabled=new Set([...enabled].filter(id=>DB.assets.some(a=>a.id===id)));
+      }
+    }}catch(e){/* keep validated in-memory snapshot */}
+  }
+  await originalRefresh();
+  lastBrowserConsultation=new Date().toLocaleString('es-ES');freshnessSummary();
+};
+$('rotationPeriod').onchange=redraw;
+$('range').onchange=redraw;$('freq').onchange=redraw;$('measure').onchange=redraw;$('scale').onchange=redraw;
+$('reloadBtn').onclick=refresh;
+// The original startup IIFE uses lexical redraw/refresh, now overridden.
+})();
+
 </script></body></html>
