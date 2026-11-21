@@ -63,7 +63,7 @@ jobs:
           SECONDARY_URL = 'https://www.privatewealthdaily.com/etf/{}?r=1m'
           CAL = xcals.get_calendar('XNYS')
           SESSION = requests.Session()
-          SESSION.headers.update({'User-Agent': 'RadarCapital/4.0 (research, non-commercial polling)', 'Accept': 'application/json,text/csv,text/html,*/*', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache'})
+          SESSION.headers.update({'User-Agent': 'RadarCapital/5.0 (research, non-commercial polling)', 'Accept': 'application/json,text/csv,text/html,*/*', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache'})
           
           
           def now_utc():
@@ -123,6 +123,11 @@ jobs:
                       if row['precision']=='rounded' and old.get('precision','exact')=='exact':
                           continue
                       if same_value(old,row):
+                          # A matching verified value must not count as a revision.
+                          # Keep original origin while documenting the latest check.
+                          old['verifiedBy']=provider
+                          old['lastVerifiedAt']=checked
+                          old.setdefault('url',url)
                           continue
                       revisions.append({'asset':asset['id'],'field':'daily.flow','date':d,
                                         'old':old.get('flow'), 'new':row['flow'],
@@ -166,43 +171,71 @@ jobs:
           
           
           def parse_secondary_html(html, ticker, calendar):
-              """Strictly parse dated daily flow table, never price or weekly totals.
+              """Read only PWD's *daily* creation/redemption table (never weekly/volume).
           
-              This source publishes rounded dollar flows. Its fallback is labelled as such.
-              If markup changes or date provenance cannot be established, return no data.
+              The provider renders its chart title as <figcaption><p class="vz-t">...
+              rather than an h1-h6 heading. The actual dated table lives in the same
+              <figure>, normally under <details>. If either scope or provenance is
+              missing, return [] instead of guessing.
               """
               soup=BeautifulSoup(html,'html.parser')
               title=(soup.title.get_text(' ',strip=True) if soup.title else '')
-              if not re.match(r'^'+re.escape(ticker)+r'\s*(?:[—|\-:])', title, re.I):return []
-              text=soup.get_text(' ',strip=True)
-              hdr=re.search(r'Price through\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*[·|\-]\s*Flows through\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})',text,re.I)
-              if not hdr:return []
-              asof=parse_publication_date(hdr.group(2))
+              if not re.match(r'^'+re.escape(ticker)+r'\s*(?:[—\-:])',title,re.I):return []
+              header=soup.get_text(' ',strip=True)
+              m=re.search(r'Price through\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})\s*[·\-]\s*Flows through\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})',header,re.I)
+              if not m:return []
+              asof=parse_publication_date(m.group(2))
               if not asof or asof not in calendar:return []
+              tables=[]
+              for figure in soup.find_all('figure'):
+                  caption=figure.find('figcaption')
+                  if caption and re.search(r'\bDaily net flows\b',caption.get_text(' ',strip=True),re.I):
+                      # Only the table belonging to the validated DAILY figure.
+                      inside=figure.find_all('table')
+                      tables.extend(inside)
+                      if not inside:
+                          # Some versions place the expandable table immediately after
+                          # the chart figure; never jump into the next chart's figure.
+                          for sibling in figure.next_siblings:
+                              if not getattr(sibling,'name',None):continue
+                              if sibling.name in ('figure','section','article') or sibling.find('figcaption'):break
+                              candidate=sibling if sibling.name=='table' else sibling.find('table')
+                              if candidate is not None:
+                                  tables.append(candidate);break
+              # Older markup may render a heading before a table instead of a figure.
+              if not tables:
+                  for heading in soup.find_all(re.compile(r'^h[1-6]$')):
+                      if not re.search(r'\bDaily net flows\b',heading.get_text(' ',strip=True),re.I):continue
+                      candidate=heading.find_next('table')
+                      next_heading=heading.find_next(re.compile(r'^h[1-6]$'))
+                      if candidate and (not next_heading or candidate.sourceline is None or next_heading.sourceline is None or candidate.sourceline<next_heading.sourceline):
+                          tables.append(candidate)
               parsed=[]
-              for heading in soup.find_all(re.compile('^h[1-6]$')):
-                  if not re.search(r'Daily net flows',heading.get_text(' ',strip=True),re.I):
-                      continue
-                  table=heading.find_next('table')
-                  if table is None:continue
-                  next_heading=heading.find_next(re.compile('^h[1-6]$'))
-                  if next_heading and table.sourceline and next_heading.sourceline and table.sourceline > next_heading.sourceline:continue
-                  header=table.find('tr')
-                  if not header or 'Label' not in header.get_text(' ',strip=True) or 'Value' not in header.get_text(' ',strip=True):continue
-                  for tr in table.find_all('tr')[1:]:
+              for table in tables:
+                  rows=table.find_all('tr')
+                  if not rows:continue
+                  headers=[td.get_text(' ',strip=True).lower() for td in rows[0].find_all(['th','td'])]
+                  # Require exact 'Label' and 'Value ($)' columns; no chart summary rows.
+                  if len(headers)<2 or headers[0]!='label' or not headers[1].startswith('value'):continue
+                  for tr in rows[1:]:
                       td=tr.find_all(['td','th'])
                       if len(td)<2:continue
-                      m=re.fullmatch(r'([A-Za-z]{3})\s+(\d{1,2})(?:,\s*(\d{4}))?',td[0].get_text(' ',strip=True))
-                      if not m:continue
-                      y=int(m.group(3)) if m.group(3) else int(asof[:4]);month=datetime.strptime(m.group(1).title(),'%b').month;day=int(m.group(2))
-                      try:d=f'{y:04d}-{month:02d}-{day:02d}';dt=datetime.strptime(d,'%Y-%m-%d').date()
+                      label=td[0].get_text(' ',strip=True)
+                      date_match=re.fullmatch(r'([A-Za-z]{3})\s+(\d{1,2})(?:,\s*(\d{4}))?',label)
+                      if not date_match:continue
+                      year=int(date_match.group(3)) if date_match.group(3) else int(asof[:4])
+                      try:month=datetime.strptime(date_match.group(1).title(),'%b').month
                       except ValueError:continue
-                      # Year rollover: e.g. report Jan 2027 includes Dec 2026.
-                      if d>asof and not m.group(3):d=f'{y-1:04d}-{month:02d}-{day:02d}'
+                      day=int(date_match.group(2))
+                      try:d=f'{year:04d}-{month:02d}-{day:02d}';datetime.strptime(d,'%Y-%m-%d')
+                      except ValueError:continue
+                      if d>asof and not date_match.group(3):
+                          year-=1;d=f'{year:04d}-{month:02d}-{day:02d}'
                       if d not in calendar or d>asof:continue
                       display=td[1].get_text(' ',strip=True)
                       amount=parse_rounded_flow(display)
-                      if amount is not None:parsed.append({'d':d,'flow':amount,'approx':True,'displayFlow':display,'spanDays':1})
+                      if amount is not None:
+                          parsed.append({'d':d,'flow':amount,'approx':True,'displayFlow':display,'spanDays':1})
                   if parsed:break
               return sorted({r['d']:r for r in parsed}.values(),key=lambda v:v['d'])
           
@@ -327,6 +360,8 @@ jobs:
                       state['ETFIQ']='technical_error'; errors.append(f'ETFIQ {ticker}: {e}')
                   # Secondary only for dates newer than ETFIQ, with rounded published precision.
                   try:
+                      if ticker=='IAU':
+                          state['PWD']='not_available_for_IAU';source_status[ticker]=state;continue
                       page=get(SECONDARY_URL.format(ticker),kind='text')
                       rows=parse_secondary_html(page,ticker,calendar)
                       if rows:
@@ -361,12 +396,15 @@ jobs:
               else:
                   errors.append('Gold aggregate: incomplete issuer pair; retained prior snapshot')
               for ticker in PRICE_TICKERS:
-                  a=assets['ORO'] if ticker=='GLD' else assets[ticker]
+                  a=assets['ORO' if ticker=='GLD' else ticker]
                   try:
-                      try:rows=fetch_price_stooq(ticker,calendar)
-                      except Exception as e:
-                          errors.append(f'Stooq {ticker}: {e}; attempting Yahoo')
-                          rows=fetch_price_yahoo(ticker,calendar)
+                      # Yahoo daily close is the verified working source. Stooq is a
+                      # true fallback instead of producing eight routine CSV warnings.
+                      try:rows=fetch_price_yahoo(ticker,calendar)
+                      except Exception as yahoo_error:
+                          source_status.setdefault(ticker,{})['Yahoo']='technical_error'
+                          errors.append(f'Yahoo {ticker}: {yahoo_error}; attempting Stooq')
+                          rows=fetch_price_stooq(ticker,calendar)
                       merge_prices(a,rows,checked,revisions,calendar)
                       done.append(f'Prices {ticker}: {len(rows)} daily closes')
                   except Exception as e:errors.append(f'Price {ticker}: {e}')
@@ -382,7 +420,7 @@ jobs:
                   latest.append(last)
                   a['asOf']=last
                   a['flowLagSessions']=lag_sessions(calendar,last)
-                  a['flowSourceLatest']=next((v.get('src','desconocida') for v in reversed(a['daily']) if v['d']==last),'')
+                  a['flowSourceLatest']=next(((v.get('src','desconocida') if v.get('src') not in ('history','capture','daily') else 'ETFIQ') for v in reversed(a['daily']) if v['d']==last),'')
                   a['lastConsulted']=checked
                   a['sourceStatus']=source_status.get('GLD' if a['id']=='ORO' else a['id'],{})
               common=set.intersection(*valid_sets) if valid_sets else set()
